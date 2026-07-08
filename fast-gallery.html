@@ -120,6 +120,28 @@
   }
   .colorSwatch.on{border-color:#fff; box-shadow:0 0 0 1px #000 inset}
 
+  .folderStrip{
+    display:inline-flex; gap:4px; flex-wrap:nowrap;
+    max-width:38vw; overflow-x:auto;
+    padding:2px 0;
+  }
+  .folderChip{
+    display:inline-flex; align-items:center; gap:4px;
+    padding:3px 8px; background:var(--ctrl-bg);
+    border:1px solid var(--stroke); border-radius:6px;
+    font-size:11px; color:var(--fg); cursor:pointer;
+    white-space:nowrap; max-width:180px;
+    overflow:hidden; text-overflow:ellipsis;
+    user-select:none;
+  }
+  .folderChip:hover{background:var(--ctrl-bg-hover)}
+  .folderChip.on{
+    background:rgba(120,200,150,.16);
+    border-color:rgba(140,220,170,.35);
+    color:#fff;
+  }
+  .folderChip.root{font-style:italic; opacity:.85}
+
   #grid{
     position:relative;
     padding:14px 12px 40px;
@@ -132,7 +154,17 @@
     border-radius:var(--radius); overflow:hidden;
     will-change:top,left; contain:layout paint;
     content-visibility:auto; contain-intrinsic-size:320px 240px;
+    border-left-width:3px;
+    border-left-color:var(--stroke);
   }
+  .tile[data-depth="1"]{border-left-color:hsl(  47, 45%, 28%)}
+  .tile[data-depth="2"]{border-left-color:hsl(  94, 45%, 28%)}
+  .tile[data-depth="3"]{border-left-color:hsl( 141, 45%, 28%)}
+  .tile[data-depth="4"]{border-left-color:hsl( 188, 45%, 28%)}
+  .tile[data-depth="5"]{border-left-color:hsl( 235, 45%, 32%)}
+  .tile[data-depth="6"]{border-left-color:hsl( 282, 45%, 30%)}
+  .tile[data-depth="7"]{border-left-color:hsl( 329, 45%, 30%)}
+  .tile[data-depth="8"]{border-left-color:hsl(  16, 45%, 30%)}
   .thumb{
     width:100%; height:100%; display:block;
     object-fit:cover; background:#050505;
@@ -162,6 +194,20 @@
     user-select:none; pointer-events:none; display:none;
   }
   .tile[data-hasprompt="1"] .pchip{display:block}
+
+  .fchip{
+    position:absolute; left:8px; bottom:36px;
+    padding:2px 7px; border-radius:999px;
+    font-size:10.5px; color:rgba(255,255,255,.78);
+    background:rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.08);
+    max-width:calc(100% - 60px);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    user-select:none; pointer-events:none;
+    display:none;
+    letter-spacing:.2px;
+  }
+  .tile[data-folder]:not([data-folder=""]) .fchip{ display:block; }
   .star{
     position:absolute; right:8px; top:8px;
     width:26px; height:26px; border-radius:50%;
@@ -356,6 +402,11 @@
       <div id="pfProg" class="meta" style="display:none">0 / 0</div>
     </div>
 
+    <div class="toggle" title="Include images from subfolders when a folder is selected">
+      <div class="tlabel">Recursive</div>
+      <div id="recSwitch" class="switch" role="switch" aria-checked="true" tabindex="0"><div class="knob"></div></div>
+    </div>
+
     <button id="dlAllBtn" class="btn" style="display:none">Download selected (zip)</button>
 
     <div class="spacer"></div>
@@ -388,6 +439,8 @@
     <input id="kwQuery" type="search" placeholder="Prompt keywords..." />
 
     <div id="colorStrip" class="colorStrip"></div>
+
+    <div id="folderStrip" class="folderStrip"></div>
 
     <button id="favOnly" class="btn" title="Show favorites only">★ only</button>
     <button id="resetFilters" class="btn" title="Clear all filters">Reset</button>
@@ -496,8 +549,10 @@ const fmtWrapEl = document.getElementById('fmtWrap');
 const oriSel    = document.getElementById('oriSel');
 const kwQuery   = document.getElementById('kwQuery');
 const colorStripEl = document.getElementById('colorStrip');
+const folderStripEl = document.getElementById('folderStrip');
 const favOnlyBtn = document.getElementById('favOnly');
 const resetFiltersBtn = document.getElementById('resetFilters');
+const recSwitch = document.getElementById('recSwitch');
 
 const reopenBanner = document.getElementById('reopenBanner');
 const reopenYes = document.getElementById('reopenYes');
@@ -693,6 +748,17 @@ const extOf = (name) => (name.match(/\.[^.]+$/)?.[0] || "").toLowerCase();
 const isImage = (name) => IMAGE_EXT_RE.test(name || "");
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const isValidIndex = (i) => Number.isInteger(i) && i >= 0 && i < files.length;
+function folderOf(path) {
+  const s = String(path || "");
+  const i = s.lastIndexOf("/");
+  return i < 0 ? "" : s.slice(0, i);
+}
+function depthOf(folder) {
+  if (!folder) return 0;
+  let n = 1;
+  for (let i = 0; i < folder.length; i++) if (folder.charCodeAt(i) === 47) n++;
+  return n;
+}
 
 function dlNameForIndex(i) {
   return `${i + 1}${extOf(files[i].name)}`;
@@ -1265,6 +1331,7 @@ const filterState = (() => {
     sortBy:'name', sortDir:'asc', query:'', formats:null,
     orientation:'all', colors:new Set(), keyword:'',
     favoritesOnly:false, randomSeed:1,
+    folders:new Set(), recursive:true,
   };
   try {
     const raw = localStorage.getItem('fast_gallery_view');
@@ -1278,6 +1345,8 @@ const filterState = (() => {
       if (Array.isArray(p.colors)) d.colors = new Set(p.colors);
       if (typeof p.keyword === 'string') d.keyword = p.keyword;
       if (typeof p.favoritesOnly === 'boolean') d.favoritesOnly = p.favoritesOnly;
+      if (Array.isArray(p.folders)) d.folders = new Set(p.folders);
+      if (typeof p.recursive === 'boolean') d.recursive = p.recursive;
     }
   } catch (_) {}
   return d;
@@ -1292,6 +1361,8 @@ function saveFilterState() {
       colors:Array.from(filterState.colors),
       keyword:filterState.keyword,
       favoritesOnly:filterState.favoritesOnly,
+      folders:Array.from(filterState.folders),
+      recursive:filterState.recursive,
     }));
   } catch (_) {}
 }
@@ -1340,6 +1411,18 @@ function buildView() {
   if (filterState.query) {
     const q = filterState.query.toLowerCase();
     out = out.filter(i => files[i].path.toLowerCase().includes(q));
+  }
+  if (filterState.folders.size > 0) {
+    const rec = filterState.recursive;
+    const sels = Array.from(filterState.folders);
+    out = out.filter(i => {
+      const f = folderOf(files[i].path);
+      for (const sel of sels) {
+        if (rec) { if (f === sel || (sel === "" ? true : f.startsWith(sel + "/"))) return true; }
+        else { if (f === sel) return true; }
+      }
+      return false;
+    });
   }
   if (filterState.orientation !== 'all') {
     const o = filterState.orientation;
@@ -1465,6 +1548,7 @@ function makeTileNode() {
   const num = document.createElement('div'); num.className = 'num';
   const dim = document.createElement('div'); dim.className = 'dim';
   const pchip = document.createElement('div'); pchip.className = 'pchip'; pchip.textContent = 'P';
+  const fchip = document.createElement('div'); fchip.className = 'fchip';
   const star = document.createElement('div'); star.className = 'star'; star.textContent = '★';
   const selWrap = document.createElement('div'); selWrap.className = 'selWrap';
   const sel = document.createElement('input'); sel.type = 'checkbox'; sel.className = 'sel';
@@ -1473,25 +1557,34 @@ function makeTileNode() {
   dl.type = 'button'; dl.className = 'dl'; dl.title = 'Download';
   dl.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M12 3v10m0 0 4-4m-4 4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3h16v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
   tile.appendChild(img); tile.appendChild(num); tile.appendChild(dim);
-  tile.appendChild(pchip); tile.appendChild(star); tile.appendChild(selWrap); tile.appendChild(dl);
+  tile.appendChild(pchip); tile.appendChild(fchip); tile.appendChild(star); tile.appendChild(selWrap); tile.appendChild(dl);
   return tile;
 }
 
 function applyTileData(node, slot) {
   const i = slot.index;
   const entry = files[i];
+  const folder = folderOf(entry.path);
+  const depth = depthOf(folder);
   node.dataset.index = String(i);
   node.dataset.k = String(slot.k);
   node.dataset.selected = selected.has(i) ? "1" : "0";
   node.dataset.hasprompt = (prompts[i] && prompts[i].length) ? "1" : "0";
   node.dataset.fav = favorites.has(entry.path) ? "1" : "0";
+  node.dataset.folder = folder;
+  node.dataset.depth = String(Math.min(depth, 8));
 
   const img = node.querySelector('img.thumb');
   const num = node.querySelector('.num');
   const dim = node.querySelector('.dim');
+  const fchip = node.querySelector('.fchip');
   const sel = node.querySelector('.sel');
   num.textContent = String(i + 1);
   dim.textContent = fmtDims(dims[i] || null);
+  if (fchip) {
+    fchip.textContent = folder;
+    fchip.title = folder;
+  }
   sel.checked = selected.has(i);
   sel.dataset.index = String(i);
 
@@ -2150,6 +2243,8 @@ resetFiltersBtn.addEventListener('click', () => {
   filterState.formats = null; refreshFormatChips();
   filterState.colors.clear(); renderColorStrip();
   filterState.favoritesOnly = false; favOnlyBtn.classList.remove('on');
+  filterState.folders.clear(); renderFolderStrip();
+  filterState.recursive = true; syncRecSwitch();
   saveFilterState(); applyFilters();
 });
 
@@ -2195,6 +2290,51 @@ function renderColorStrip() {
   }
 }
 renderColorStrip();
+
+function renderFolderStrip() {
+  while (folderStripEl.firstChild) folderStripEl.removeChild(folderStripEl.firstChild);
+  if (!files.length) return;
+  const set = new Set();
+  for (const f of files) set.add(folderOf(f.path));
+  const list = Array.from(set).sort((a, b) => a.localeCompare(b));
+  // Prune stale selections not present in the current folder set.
+  let mutated = false;
+  for (const sel of Array.from(filterState.folders)) {
+    if (!set.has(sel)) { filterState.folders.delete(sel); mutated = true; }
+  }
+  if (mutated) saveFilterState();
+  if (list.length <= 1) return;
+  for (const folder of list) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'folderChip' + (folder === '' ? ' root' : '');
+    btn.textContent = folder === '' ? '▸ root' : (folder.split('/').pop() || folder);
+    btn.title = folder === '' ? '(root)' : folder;
+    if (filterState.folders.has(folder)) btn.classList.add('on');
+    btn.addEventListener('click', () => {
+      if (filterState.folders.has(folder)) filterState.folders.delete(folder);
+      else filterState.folders.add(folder);
+      btn.classList.toggle('on');
+      saveFilterState(); applyFilters();
+    });
+    folderStripEl.appendChild(btn);
+  }
+}
+
+function syncRecSwitch() {
+  recSwitch.classList.toggle('on', filterState.recursive);
+  recSwitch.setAttribute('aria-checked', filterState.recursive ? "true" : "false");
+}
+syncRecSwitch();
+function flipRec() {
+  filterState.recursive = !filterState.recursive;
+  syncRecSwitch();
+  saveFilterState(); applyFilters();
+}
+recSwitch.addEventListener('click', flipRec);
+recSwitch.addEventListener('keydown', (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flipRec(); }
+});
 
 // =====================================================================
 // Cols slider + multi-select + prefetch
@@ -2338,6 +2478,7 @@ async function resetAndLoadFiles(entries, key) {
   countEl.textContent = `${files.length} image${files.length === 1 ? "" : "s"}`;
 
   refreshFormatChips();
+  renderFolderStrip();
   updateSelectionUI();
   updatePrefetchUI();
 
