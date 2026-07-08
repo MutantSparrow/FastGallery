@@ -6,8 +6,11 @@
 <title>Fast Gallery</title>
 <style>
   :root{
+    color-scheme: dark;
     --bg:#000; --fg:#d8d8d8; --muted:#8a8a8a;
     --tile:#0b0b0b; --stroke:#202020;
+    --ctrl-bg:#1a1a1a; --ctrl-bg-hover:#242424;
+    --ctrl-fg:#d8d8d8;
     --gap:12px; --radius:12px; --barH:104px;
   }
   *{box-sizing:border-box}
@@ -50,12 +53,34 @@
   .ctrl .val{width:18px; text-align:right; color:var(--fg); font-size:12px;}
 
   select, input[type="text"], input[type="search"]{
-    background:rgba(255,255,255,.05); color:var(--fg);
+    background:var(--ctrl-bg); color:var(--ctrl-fg);
     border:1px solid var(--stroke); border-radius:8px;
     padding:5px 8px; font:inherit; outline:none;
+    accent-color:#fff;
   }
-  select:focus, input:focus{border-color:rgba(255,255,255,.25)}
+  select{
+    appearance:none;
+    -webkit-appearance:none;
+    padding-right:26px;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+      linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat:no-repeat;
+  }
+  select:hover{background-color:var(--ctrl-bg-hover)}
+  select:focus, input:focus{border-color:rgba(255,255,255,.30)}
+  select option{
+    background:#1a1a1a;
+    color:#d8d8d8;
+  }
+  select option:checked, select option:hover{
+    background:#2a2a2a;
+    color:#ffffff;
+  }
   input[type="search"]{width:180px}
+  input::placeholder{color:var(--muted); opacity:.85}
 
   .toggle{
     display:flex; align-items:center; gap:8px;
