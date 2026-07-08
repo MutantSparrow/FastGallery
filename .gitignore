@@ -5,3 +5,12 @@ desktop.ini
 node_modules/
 .vscode/
 .idea/
+
+# Local development artifacts, not part of the repo
+Test/
+Gallery_v1.html
+Gallery_v2.html
+Gallery_v3.html
+Gallery_Create.py
+output_gallery.jpg
+output_gallery_large.jpg
