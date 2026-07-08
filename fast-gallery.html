@@ -1,0 +1,2427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Fast Gallery</title>
+<style>
+  :root{
+    --bg:#000; --fg:#d8d8d8; --muted:#8a8a8a;
+    --tile:#0b0b0b; --stroke:#202020;
+    --gap:12px; --radius:12px; --barH:104px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    overflow-y:scroll; padding-top:var(--barH);
+  }
+  html.noscroll, body.noscroll { overflow:hidden; }
+
+  .bar{
+    position:fixed; top:0; left:0; right:0; z-index:1000;
+    background:rgba(0,0,0,.82); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--stroke);
+  }
+  .bar .row{
+    display:flex; gap:8px; align-items:center;
+    padding:8px 12px; flex-wrap:wrap;
+  }
+  .btn{
+    border:1px solid var(--stroke); background:rgba(255,255,255,.04);
+    color:var(--fg); padding:6px 10px; border-radius:8px;
+    cursor:pointer; user-select:none; font:inherit;
+  }
+  .btn:hover{background:rgba(255,255,255,.07)}
+  .btn.on{background:rgba(120,200,150,.16); border-color:rgba(140,220,170,.35)}
+  .btn[disabled]{opacity:.55; cursor:not-allowed}
+  .meta{color:var(--muted); white-space:nowrap; font-size:12px}
+  .spacer{flex:1}
+  .hint{color:var(--muted); font-size:12px}
+
+  .ctrl{
+    display:flex; align-items:center; gap:8px;
+    padding:5px 8px; border:1px solid var(--stroke);
+    border-radius:8px; background:rgba(255,255,255,.03);
+  }
+  .ctrl label{color:var(--muted); font-size:12px; user-select:none;}
+  .ctrl input[type="range"]{width:140px; accent-color:#fff;}
+  .ctrl .val{width:18px; text-align:right; color:var(--fg); font-size:12px;}
+
+  select, input[type="text"], input[type="search"]{
+    background:rgba(255,255,255,.05); color:var(--fg);
+    border:1px solid var(--stroke); border-radius:8px;
+    padding:5px 8px; font:inherit; outline:none;
+  }
+  select:focus, input:focus{border-color:rgba(255,255,255,.25)}
+  input[type="search"]{width:180px}
+
+  .toggle{
+    display:flex; align-items:center; gap:8px;
+    padding:5px 8px; border:1px solid var(--stroke);
+    border-radius:8px; background:rgba(255,255,255,.03);
+  }
+  .toggle .tlabel{color:var(--muted); font-size:12px; user-select:none; white-space:nowrap;}
+  .switch{
+    width:34px; height:20px; border-radius:999px;
+    border:1px solid var(--stroke); background:rgba(255,255,255,.06);
+    position:relative; cursor:pointer;
+  }
+  .switch .knob{
+    position:absolute; top:2px; left:2px;
+    width:14px; height:14px; border-radius:50%;
+    background:rgba(255,255,255,.85);
+    transition:transform .16s ease;
+  }
+  .switch.on{background:rgba(120,200,150,.22); border-color:rgba(140,220,170,.35)}
+  .switch.on .knob{transform:translateX(14px)}
+
+  .fmtWrap{display:inline-flex; gap:4px; flex-wrap:wrap;}
+  .fmtChip{
+    display:inline-flex; align-items:center; gap:4px;
+    padding:2px 6px; background:rgba(255,255,255,.04);
+    border:1px solid var(--stroke); border-radius:6px;
+    font-size:11px; color:var(--fg); cursor:pointer;
+    text-transform:uppercase; letter-spacing:.3px;
+  }
+  .fmtChip.off{opacity:.4}
+  .fmtChip input{margin:0; accent-color:#fff}
+
+  .colorStrip{display:inline-flex; gap:3px}
+  .colorSwatch{
+    width:20px; height:20px; border-radius:50%;
+    border:2px solid transparent; cursor:pointer; padding:0;
+  }
+  .colorSwatch.on{border-color:#fff; box-shadow:0 0 0 1px #000 inset}
+
+  #grid{
+    position:relative;
+    padding:14px 12px 40px;
+    width:100%; min-height:1px;
+    contain:layout paint;
+  }
+  .tile{
+    position:absolute; margin:0;
+    background:var(--tile); border:1px solid var(--stroke);
+    border-radius:var(--radius); overflow:hidden;
+    will-change:top,left; contain:layout paint;
+    content-visibility:auto; contain-intrinsic-size:320px 240px;
+  }
+  .thumb{
+    width:100%; height:100%; display:block;
+    object-fit:cover; background:#050505;
+  }
+  .num{
+    position:absolute; top:8px; left:8px;
+    padding:3px 7px; border-radius:999px;
+    font-size:12px; color:rgba(255,255,255,.92);
+    background:rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.10);
+    letter-spacing:.2px; user-select:none; pointer-events:none;
+  }
+  .dim{
+    position:absolute; left:8px; bottom:8px;
+    padding:3px 7px; border-radius:999px;
+    font-size:12px; color:rgba(255,255,255,.88);
+    background:rgba(0,0,0,.45);
+    border:1px solid rgba(255,255,255,.10);
+    user-select:none; pointer-events:none;
+  }
+  .pchip{
+    position:absolute; left:8px; top:36px;
+    padding:2px 6px; border-radius:999px;
+    font-size:11px; color:rgba(255,255,255,.92);
+    background:rgba(50,140,80,.55);
+    border:1px solid rgba(120,220,150,.35);
+    user-select:none; pointer-events:none; display:none;
+  }
+  .tile[data-hasprompt="1"] .pchip{display:block}
+  .star{
+    position:absolute; right:8px; top:8px;
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.14);
+    color:rgba(255,255,255,.55);
+    display:grid; place-items:center;
+    cursor:pointer; font-size:14px;
+    user-select:none;
+  }
+  .star:hover{color:rgba(255,255,255,.95)}
+  .tile[data-fav="1"] .star{color:#f6c445; border-color:rgba(246,196,69,.35)}
+  .dl{
+    position:absolute; right:8px; bottom:8px;
+    width:32px; height:32px; border-radius:10px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(0,0,0,.55); color:rgba(255,255,255,.92);
+    display:grid; place-items:center; cursor:pointer;
+  }
+  .dl:hover{background:rgba(255,255,255,.08)}
+  .dl svg{width:16px; height:16px}
+
+  .selWrap{
+    position:absolute; top:40px; right:8px;
+    width:22px; height:22px; display:none;
+    align-items:center; justify-content:center;
+    border-radius:8px; background:rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.12);
+  }
+  body.ms .selWrap{display:flex}
+  .selWrap input{width:16px; height:16px; accent-color:#fff; cursor:pointer}
+  body.ms .tile[data-selected="1"]{
+    border-color:rgba(255,255,255,.28);
+    box-shadow:0 0 0 1px rgba(255,255,255,.18) inset;
+  }
+
+  #empty{padding:18px 12px; color:var(--muted)}
+  #reopenBanner{
+    padding:10px 12px; margin:8px 12px;
+    background:rgba(80,140,220,.10);
+    border:1px solid rgba(80,140,220,.30);
+    border-radius:8px; display:none; gap:10px; align-items:center;
+  }
+
+  #viewer{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.94);
+    display:none; z-index:2500;
+  }
+  #viewer.open{display:block}
+  #viewer .top{
+    position:absolute; left:0; right:0; top:0;
+    display:flex; gap:8px; align-items:center;
+    padding:10px 12px;
+    background:rgba(0,0,0,.55);
+    border-bottom:1px solid rgba(255,255,255,.10);
+    backdrop-filter:blur(8px); z-index:2;
+  }
+  #viewer .title{
+    color:rgba(255,255,255,.92); font-size:13px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    max-width:40vw;
+  }
+  #viewer .vdims{
+    padding:4px 8px; border-radius:999px;
+    font-size:12px; color:rgba(255,255,255,.84);
+    background:rgba(0,0,0,.35);
+    border:1px solid rgba(255,255,255,.10);
+    white-space:nowrap; user-select:none;
+  }
+  #viewer .close{margin-left:auto}
+  #viewer button.vBtn{
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.06);
+    color:rgba(255,255,255,.92);
+    border-radius:8px; padding:6px 10px;
+    cursor:pointer; font:inherit;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  #viewer button.vBtn:hover{background:rgba(255,255,255,.12)}
+  #viewer button.vBtn[disabled]{opacity:.5; cursor:not-allowed}
+  #viewer button.vBtn.on{
+    background:rgba(120,200,150,.20);
+    border-color:rgba(140,220,170,.40);
+  }
+  #viewer .navBtn{padding:6px 10px; font-size:16px}
+  #viewer .stage{
+    position:absolute; inset:52px 0 0;
+    overflow:hidden; touch-action:none;
+    user-select:none; cursor:default;
+  }
+  #viewer.zoomed .stage{cursor:grab}
+  #viewer.zoomed.dragging .stage{cursor:grabbing}
+  #viewerCanvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+  #viewer .loading{
+    position:absolute; left:12px; bottom:12px;
+    padding:6px 10px; border-radius:999px;
+    font-size:12px; color:rgba(255,255,255,.9);
+    background:rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.10);
+    pointer-events:none; display:none; z-index:3;
+  }
+  #viewer.loading .loading{display:block}
+  #viewer .badge{
+    position:absolute; right:12px; bottom:12px;
+    padding:6px 10px; border-radius:999px;
+    font-size:12px; color:rgba(255,255,255,.85);
+    background:rgba(0,0,0,.45);
+    border:1px solid rgba(255,255,255,.10);
+    pointer-events:none; display:none; z-index:3;
+  }
+  #viewer .badge.show{display:block}
+  #viewer .fav-on{color:#f6c445}
+
+  #promptPanel{
+    position:absolute; left:0; right:0; bottom:0;
+    max-height:45vh; display:none; flex-direction:column;
+    background:rgba(0,0,0,.85);
+    border-top:1px solid rgba(255,255,255,.14);
+    backdrop-filter:blur(10px); z-index:4;
+  }
+  #viewer.showPrompt #promptPanel{display:flex}
+  #promptPanel .phdr{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 12px;
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  #promptPanel .ptitle{
+    font-size:12px; color:rgba(255,255,255,.75);
+    letter-spacing:.3px; text-transform:uppercase;
+  }
+  #promptPanel .pcount{font-size:11px; color:rgba(255,255,255,.55)}
+  #promptPanel .pnav{display:flex; gap:6px; align-items:center}
+  #promptPanel .pnav button, #promptPanel .pact button{
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.05);
+    color:rgba(255,255,255,.85);
+    border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer;
+  }
+  #promptPanel .pnav button:hover, #promptPanel .pact button:hover{background:rgba(255,255,255,.12)}
+  #promptPanel .pnav button[disabled]{opacity:.4; cursor:not-allowed}
+  #promptPanel .pact{margin-left:auto; display:flex; gap:6px}
+  #promptText{
+    padding:10px 14px 14px;
+    overflow:auto;
+    font:12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color:rgba(255,255,255,.92);
+    white-space:pre-wrap; word-break:break-word;
+    user-select:text; max-height:calc(45vh - 44px);
+  }
+  #promptText.empty{color:rgba(255,255,255,.45); font-style:italic}
+
+  #shortcuts{
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    background:rgba(0,0,0,.90); color:#fff;
+    padding:16px 24px; border-radius:10px; z-index:9999;
+    font:13px ui-monospace, monospace;
+    box-shadow:0 8px 40px rgba(0,0,0,.5);
+    display:none;
+    border:1px solid rgba(255,255,255,.18);
+  }
+  #shortcuts table{border-collapse:collapse}
+  #shortcuts td{padding:4px 14px}
+  #shortcuts td.k{color:#7cf; text-align:right; white-space:nowrap}
+  #shortcuts h3{margin:0 0 8px; font-size:13px; letter-spacing:.5px; text-transform:uppercase; color:#aaa}
+</style>
+</head>
+<body>
+
+<div class="bar" id="topBar">
+  <div class="row" id="row1">
+    <button id="pickBtn" class="btn">Open folder</button>
+    <div id="count" class="meta">0 images</div>
+    <div id="viewCountWrap" class="meta" style="display:none"><span id="viewCount">0</span> shown</div>
+
+    <div class="ctrl" title="Target columns">
+      <label for="colSlider">Cols</label>
+      <input id="colSlider" type="range" min="1" max="8" step="1" value="4" />
+      <div id="colVal" class="val">4</div>
+    </div>
+
+    <div class="toggle" title="Multi-select">
+      <div class="tlabel">Multi</div>
+      <div id="msSwitch" class="switch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
+      <div id="selCount" class="meta" style="display:none">0 selected</div>
+    </div>
+
+    <div class="toggle" title="Scan every image for prompt metadata">
+      <div class="tlabel">Prefetch prompts</div>
+      <div id="pfSwitch" class="switch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
+      <div id="pfProg" class="meta" style="display:none">0 / 0</div>
+    </div>
+
+    <button id="dlAllBtn" class="btn" style="display:none">Download selected (zip)</button>
+
+    <div class="spacer"></div>
+    <button id="helpBtn" class="btn" title="Keyboard shortcuts">?</button>
+  </div>
+
+  <div class="row" id="row2">
+    <select id="sortBy" title="Sort by">
+      <option value="name">Name</option>
+      <option value="date">Date</option>
+      <option value="size">Size</option>
+      <option value="width">Width</option>
+      <option value="height">Height</option>
+      <option value="area">Area</option>
+      <option value="random">Random</option>
+    </select>
+    <button id="sortDir" class="btn" title="Sort direction">↑</button>
+
+    <input id="fnQuery" type="search" placeholder="Filename..." />
+
+    <div id="fmtWrap" class="fmtWrap"></div>
+
+    <select id="oriSel" title="Orientation filter">
+      <option value="all">Any orientation</option>
+      <option value="portrait">Portrait</option>
+      <option value="landscape">Landscape</option>
+      <option value="square">Square</option>
+    </select>
+
+    <input id="kwQuery" type="search" placeholder="Prompt keywords..." />
+
+    <div id="colorStrip" class="colorStrip"></div>
+
+    <button id="favOnly" class="btn" title="Show favorites only">★ only</button>
+    <button id="resetFilters" class="btn" title="Clear all filters">Reset</button>
+  </div>
+</div>
+
+<input id="dirInput" type="file" multiple webkitdirectory hidden />
+
+<div id="reopenBanner">
+  <span id="reopenText">Reopen last folder?</span>
+  <button id="reopenYes" class="btn">Reopen</button>
+  <button id="reopenNo" class="btn">Dismiss</button>
+</div>
+
+<div id="empty">No folder selected.</div>
+<div id="grid" aria-live="polite"></div>
+
+<div id="viewer" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="top">
+    <div id="viewerTitle" class="title"></div>
+    <div id="viewerDims" class="vdims"></div>
+
+    <button id="viewerPrev" class="vBtn navBtn" type="button" aria-label="Previous">◀</button>
+    <button id="viewerNext" class="vBtn navBtn" type="button" aria-label="Next">▶</button>
+
+    <button id="viewerPrompt" class="vBtn" type="button" title="Show prompt (P)">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px;height:16px">
+        <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Prompt
+    </button>
+
+    <button id="viewerFav" class="vBtn" type="button" title="Favorite (F)">☆</button>
+    <button id="viewerCopy" class="vBtn" type="button" title="Copy path (C)">Copy</button>
+    <button id="viewerDl" class="vBtn" type="button" title="Download original">Download</button>
+    <button id="viewerFull" class="vBtn" type="button" title="Full resolution">Full-res</button>
+    <button id="viewerClose" class="vBtn close" type="button">Close</button>
+  </div>
+
+  <div class="stage" id="viewerStage">
+    <canvas id="viewerCanvas"></canvas>
+  </div>
+
+  <div class="loading">Decoding…</div>
+  <div id="viewerBadge" class="badge"></div>
+
+  <div id="promptPanel">
+    <div class="phdr">
+      <div class="ptitle">Prompt</div>
+      <div id="pcount" class="pcount"></div>
+      <div class="pnav">
+        <button id="pPrev" type="button">◀</button>
+        <button id="pNext" type="button">▶</button>
+      </div>
+      <div class="pact">
+        <button id="pCopy" type="button">Copy</button>
+        <button id="pClose" type="button">Hide</button>
+      </div>
+    </div>
+    <div id="promptText" class="empty">No prompt data.</div>
+  </div>
+
+  <div id="shortcuts">
+    <h3>Shortcuts</h3>
+    <table>
+      <tr><td class="k">← / →</td><td>prev / next image</td></tr>
+      <tr><td class="k">P</td><td>toggle prompt panel</td></tr>
+      <tr><td class="k">← / →</td><td>cycle prompts (when panel open)</td></tr>
+      <tr><td class="k">F</td><td>toggle favorite</td></tr>
+      <tr><td class="k">C</td><td>copy path</td></tr>
+      <tr><td class="k">Esc</td><td>hide panel, then close viewer</td></tr>
+      <tr><td class="k">?</td><td>toggle this help</td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+// =====================================================================
+// DOM refs
+// =====================================================================
+const topBar   = document.getElementById('topBar');
+const dirInput = document.getElementById('dirInput');
+const pickBtn  = document.getElementById('pickBtn');
+const grid     = document.getElementById('grid');
+const empty    = document.getElementById('empty');
+const countEl  = document.getElementById('count');
+const viewCountWrap = document.getElementById('viewCountWrap');
+const viewCountEl   = document.getElementById('viewCount');
+
+const colSlider = document.getElementById('colSlider');
+const colVal    = document.getElementById('colVal');
+const msSwitch  = document.getElementById('msSwitch');
+const selCount  = document.getElementById('selCount');
+const dlAllBtn  = document.getElementById('dlAllBtn');
+const pfSwitch  = document.getElementById('pfSwitch');
+const pfProg    = document.getElementById('pfProg');
+const helpBtn   = document.getElementById('helpBtn');
+
+const sortBySel = document.getElementById('sortBy');
+const sortDirBtn = document.getElementById('sortDir');
+const fnQuery   = document.getElementById('fnQuery');
+const fmtWrapEl = document.getElementById('fmtWrap');
+const oriSel    = document.getElementById('oriSel');
+const kwQuery   = document.getElementById('kwQuery');
+const colorStripEl = document.getElementById('colorStrip');
+const favOnlyBtn = document.getElementById('favOnly');
+const resetFiltersBtn = document.getElementById('resetFilters');
+
+const reopenBanner = document.getElementById('reopenBanner');
+const reopenYes = document.getElementById('reopenYes');
+const reopenNo  = document.getElementById('reopenNo');
+
+const viewer      = document.getElementById('viewer');
+const viewerTitle = document.getElementById('viewerTitle');
+const viewerDims  = document.getElementById('viewerDims');
+const viewerClose = document.getElementById('viewerClose');
+const viewerDl    = document.getElementById('viewerDl');
+const viewerFull  = document.getElementById('viewerFull');
+const viewerPrompt= document.getElementById('viewerPrompt');
+const viewerPrev  = document.getElementById('viewerPrev');
+const viewerNext  = document.getElementById('viewerNext');
+const viewerFav   = document.getElementById('viewerFav');
+const viewerCopy  = document.getElementById('viewerCopy');
+const viewerStage = document.getElementById('viewerStage');
+const viewerCanvas= document.getElementById('viewerCanvas');
+const viewerBadge = document.getElementById('viewerBadge');
+const shortcutsEl = document.getElementById('shortcuts');
+
+const pcount     = document.getElementById('pcount');
+const pPrev      = document.getElementById('pPrev');
+const pNext      = document.getElementById('pNext');
+const pCopy      = document.getElementById('pCopy');
+const pClose     = document.getElementById('pClose');
+const promptTextEl = document.getElementById('promptText');
+
+let vctx = viewerCanvas.getContext('2d', { alpha:false, desynchronized:true }) || viewerCanvas.getContext('2d');
+const hasViewerCanvas = !!vctx;
+
+// =====================================================================
+// State
+// =====================================================================
+let files = [];   // entries: {name, path, handle, file, ext, size, lastModified}
+let view  = [];   // Array<number>, indices into files
+let dims = [];
+let dimsP = [];
+let prompts = [];
+let promptsP = [];
+let colors = [];  // {h,s,l,bucket}
+let favorites = new Set();
+let rootKey = "";
+
+let currentIndex = -1;
+let currentViewPos = 0;
+let currentPromptIdx = 0;
+let showingPromptPanel = false;
+
+let multiselect = false;
+const selected = new Set();
+
+let desiredCols = (() => {
+  const v = Number(localStorage.getItem('fast_gallery_cols') || "4");
+  return Number.isFinite(v) ? Math.max(1, Math.min(8, Math.round(v))) : 4;
+})();
+
+let prefetchActive = false;
+let prefetchDone = 0;
+let prefetchAbort = null;
+
+const GAP = 12;
+const MIN_COL_W = 240;
+const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|avif|bmp)$/i;
+
+const PREVIEW_MAX_PIXELS = 16_000_000;
+const PREVIEW_MAX_DIM = 8192;
+const PREVIEW_OVERSAMPLE = 2;
+const PNG_TEXT_MAX_SCAN = 8 * 1024 * 1024;
+const JPEG_META_MAX = 4 * 1024 * 1024;
+
+// =====================================================================
+// IndexedDB persistence
+// =====================================================================
+const IDB_NAME = 'fast_gallery';
+const STORE_HANDLES = 'handles';
+const STORE_FAVORITES = 'favorites';
+const HANDLE_KEY = 'last';
+let _idbPromise = null;
+
+function openIdb() {
+  if (_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE_HANDLES))   db.createObjectStore(STORE_HANDLES);
+      if (!db.objectStoreNames.contains(STORE_FAVORITES)) db.createObjectStore(STORE_FAVORITES);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+  return _idbPromise;
+}
+function idbGet(store, key) {
+  return openIdb().then(db => new Promise((resolve) => {
+    try {
+      const tx = db.transaction(store, 'readonly');
+      const r = tx.objectStore(store).get(key);
+      r.onsuccess = () => resolve(r.result);
+      r.onerror   = () => resolve(undefined);
+    } catch (_) { resolve(undefined); }
+  }));
+}
+function idbPut(store, val, key) {
+  return openIdb().then(db => new Promise((resolve) => {
+    try {
+      const tx = db.transaction(store, 'readwrite');
+      const r = tx.objectStore(store).put(val, key);
+      r.onsuccess = () => resolve(true);
+      r.onerror   = () => resolve(false);
+    } catch (_) { resolve(false); }
+  }));
+}
+
+// =====================================================================
+// File System Access API + fallback
+// =====================================================================
+function hasFSA() { return 'showDirectoryPicker' in window; }
+
+async function walkDirectoryFSA(dirHandle, onBatch, abortSignal) {
+  const BATCH = 200;
+  let batch = [];
+  const flush = async () => {
+    if (!batch.length) return;
+    const b = batch; batch = [];
+    try { await onBatch(b); } catch (_) {}
+  };
+  const queue = [[dirHandle, dirHandle.name || ""]];
+  while (queue.length) {
+    if (abortSignal?.aborted) break;
+    const [cur, prefix] = queue.shift();
+    try {
+      for await (const [name, child] of cur.entries()) {
+        if (abortSignal?.aborted) break;
+        const path = prefix ? prefix + "/" + name : name;
+        if (child.kind === 'directory') {
+          queue.push([child, path]);
+        } else if (child.kind === 'file' && IMAGE_EXT_RE.test(name)) {
+          batch.push({
+            name, path, handle: child, file: null,
+            ext: extOf(name).slice(1),
+            size: undefined, lastModified: undefined,
+          });
+          if (batch.length >= BATCH) await flush();
+        }
+      }
+    } catch (_) {}
+  }
+  await flush();
+}
+
+async function restoreLastHandle() {
+  try {
+    const handle = await idbGet(STORE_HANDLES, HANDLE_KEY);
+    if (!handle) return null;
+    let granted = false;
+    try {
+      const p = await handle.queryPermission({ mode:'read' });
+      granted = (p === 'granted');
+    } catch (_) {}
+    return { handle, granted };
+  } catch (_) { return null; }
+}
+
+async function requestReadPermission(handle) {
+  try { return (await handle.requestPermission({ mode:'read' })) === 'granted'; }
+  catch (_) { return false; }
+}
+
+async function getFileForEntry(entry) {
+  if (entry.file instanceof File) return entry.file;
+  try {
+    const f = await entry.handle.getFile();
+    entry.file = f;
+    return f;
+  } catch (err) { throw err; }
+}
+
+async function loadFavoritesFor(key) {
+  const arr = await idbGet(STORE_FAVORITES, key);
+  return new Set(Array.isArray(arr) ? arr : []);
+}
+async function saveFavoritesFor(key, set) {
+  if (!key) return false;
+  return await idbPut(STORE_FAVORITES, Array.from(set), key);
+}
+
+// =====================================================================
+// Utility
+// =====================================================================
+const extOf = (name) => (name.match(/\.[^.]+$/)?.[0] || "").toLowerCase();
+const isImage = (name) => IMAGE_EXT_RE.test(name || "");
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const isValidIndex = (i) => Number.isInteger(i) && i >= 0 && i < files.length;
+
+function dlNameForIndex(i) {
+  return `${i + 1}${extOf(files[i].name)}`;
+}
+function fmtDims(d) {
+  if (!d || d._unknown) return "—";
+  const w = Math.max(0, Math.round(d.w || 0));
+  const h = Math.max(0, Math.round(d.h || 0));
+  if (!w || !h) return "—";
+  return `${w}×${h}`;
+}
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let idx = 0;
+  const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+    while (idx < items.length) {
+      const cur = idx++;
+      out[cur] = await fn(items[cur], cur);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+function syncBarHeight() {
+  const h = topBar.offsetHeight || 104;
+  document.documentElement.style.setProperty('--barH', h + 'px');
+}
+requestAnimationFrame(syncBarHeight);
+
+let scrollLockY = 0, scrollLockPad = 0;
+function lockScroll() {
+  scrollLockY = window.scrollY || 0;
+  const sbw = window.innerWidth - document.documentElement.clientWidth;
+  scrollLockPad = sbw > 0 ? sbw : 0;
+  document.documentElement.classList.add('noscroll');
+  document.body.classList.add('noscroll');
+  if (scrollLockPad) {
+    document.body.style.paddingRight = scrollLockPad + "px";
+    topBar.style.paddingRight = scrollLockPad + "px";
+  }
+}
+function unlockScroll() {
+  document.documentElement.classList.remove('noscroll');
+  document.body.classList.remove('noscroll');
+  document.body.style.paddingRight = "";
+  topBar.style.paddingRight = "";
+  window.scrollTo(0, scrollLockY);
+}
+
+// =====================================================================
+// Dimensions
+// =====================================================================
+async function getPngDims(file) {
+  const ab = await file.slice(0, 64).arrayBuffer();
+  const dv = new DataView(ab);
+  if (dv.getUint32(0, false) !== 0x89504E47) throw new Error("not png");
+  const w = dv.getUint32(16, false), h = dv.getUint32(20, false);
+  if (!w || !h) throw new Error("bad png dims");
+  return { w, h };
+}
+async function getJpegDims(file) {
+  const MAX_SCAN = 2 * 1024 * 1024;
+  let lim = 256 * 1024;
+  const isSOF = (m) => (
+    m === 0xC0||m === 0xC1||m === 0xC2||m === 0xC3||
+    m === 0xC5||m === 0xC6||m === 0xC7||
+    m === 0xC9||m === 0xCA||m === 0xCB||
+    m === 0xCD||m === 0xCE||m === 0xCF
+  );
+  while (true) {
+    const ab = await file.slice(0, lim).arrayBuffer();
+    const u8 = new Uint8Array(ab);
+    const len = u8.length;
+    if (len < 4 || u8[0] !== 0xFF || u8[1] !== 0xD8) throw new Error("not jpeg");
+    let off = 2, needMore = false, reachedScan = false;
+    while (off + 4 < len) {
+      if (u8[off] !== 0xFF) { off++; continue; }
+      while (off < len && u8[off] === 0xFF) off++;
+      if (off >= len) { needMore = true; break; }
+      const marker = u8[off++];
+      if (marker === 0xD9 || marker === 0xDA) { reachedScan = true; break; }
+      if (off + 1 >= len) { needMore = true; break; }
+      const segLen = (u8[off]<<8) | u8[off+1];
+      if (segLen < 2) break;
+      if (off + segLen > len) { needMore = true; break; }
+      if (isSOF(marker)) {
+        if (off + 7 >= len) { needMore = true; break; }
+        const h = (u8[off+3]<<8)|u8[off+4];
+        const w = (u8[off+5]<<8)|u8[off+6];
+        if (!w || !h) break;
+        return { w, h };
+      }
+      off += segLen;
+    }
+    if (!reachedScan && needMore && lim < MAX_SCAN) { lim = Math.min(MAX_SCAN, lim * 2); continue; }
+    throw new Error("jpeg dims not found");
+  }
+}
+async function getGenericDimsViaBitmap(file) {
+  const b = await createImageBitmap(file);
+  const d = { w: b.width, h: b.height };
+  try { b.close(); } catch (_) {}
+  return d;
+}
+async function getDims(file) {
+  const name = (file.name || "").toLowerCase();
+  if (name.endsWith(".png")) return await getPngDims(file);
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return await getJpegDims(file);
+  return await getGenericDimsViaBitmap(file);
+}
+async function ensureDims(i) {
+  if (dims[i]) return dims[i];
+  if (!dimsP[i]) {
+    dimsP[i] = (async () => {
+      try {
+        const file = await getFileForEntry(files[i]);
+        const d = await getDims(file);
+        dims[i] = d;
+      } catch (_) {
+        dims[i] = { w: 1, h: 1, _unknown: true };
+      }
+      return dims[i];
+    })();
+  }
+  return dimsP[i];
+}
+
+// =====================================================================
+// Prompt extraction (ported)
+// =====================================================================
+const COMFY_PROMPT_INPUT_FIELDS = ["text","string","positive","prompt","Text"];
+const COMFY_ENCODER_HINTS = ["CLIPTextEncode","BNK_CLIPTextEncodeAdvanced","CLIPTextEncodeFlux","CLIPTextEncodeSDXL","smZ CLIPTextEncode","AdvancedCLIPTextEncode"];
+const COMFY_TEXT_SOURCE_HINTS = ["Text Multiline","ShowText","Show Text","Show_text","ShowAnything","String Literal","StringLiteral","String Constant","PrimitiveNode","Text Concatenate","TextConcatenate","Text Concat","Text Combine","StringFunction","easy showAnything","easy textConcat","DPRandomGenerator","Text"];
+const COMFY_PROMPT_CLASS_HINTS = ["CLIPTextEncode","BNK_CLIPTextEncodeAdvanced","CLIPTextEncodeFlux","CLIPTextEncodeSDXL","Text Multiline","Text Concatenate","ShowText","String Literal"];
+const COMFY_MAX_LINK_DEPTH = 8;
+
+function stripA1111(blob) {
+  if (typeof blob !== "string") return "";
+  const parts = blob.split(/\n(?:Negative prompt:|Steps:)/);
+  return (parts[0] || "").trim();
+}
+
+const PROMPT_MAX_LEN = 8000;
+const WORKFLOW_MARKERS = ['"class_type"','"widgets_values"','"nodes":','"links":','"last_node_id"','"last_link_id"','"extra":','"groups":','"inputs":','"outputs":'];
+function looksLikePromptText(s) {
+  if (typeof s !== "string") return false;
+  const t = s.trim();
+  if (!t) return false;
+  if (t.length > PROMPT_MAX_LEN) return false;
+  const first = t.charCodeAt(0);
+  if (first === 0x7B || first === 0x5B) {
+    try { JSON.parse(t); return false; } catch (_) {}
+  }
+  let hits = 0;
+  for (const m of WORKFLOW_MARKERS) {
+    if (t.indexOf(m) !== -1) { hits++; if (hits >= 2) return false; }
+  }
+  if (hits >= 1 && (t.indexOf("{") !== -1 || t.indexOf("[") !== -1)) return false;
+  return true;
+}
+function nodeMatches(ct, hints) { for (const h of hints) if (ct.indexOf(h) !== -1) return true; return false; }
+function isLinkRef(v) { return Array.isArray(v) && v.length === 2 && (typeof v[0] === "string" || typeof v[0] === "number") && Number.isInteger(v[1]); }
+
+function resolveTextFromNode(nodeId, graph, visited, depth) {
+  if (depth > COMFY_MAX_LINK_DEPTH) return "";
+  const nid = String(nodeId);
+  if (visited.has(nid)) return "";
+  const v2 = new Set(visited); v2.add(nid);
+  const node = graph[nid];
+  if (!node || typeof node !== "object") return "";
+  const inputs = node.inputs;
+  if (!inputs || typeof inputs !== "object") return "";
+  for (const f of COMFY_PROMPT_INPUT_FIELDS) {
+    const val = inputs[f];
+    if (typeof val === "string") { const s = val.trim(); if (s.length >= 4 && looksLikePromptText(s)) return s; }
+  }
+  const pieces = [];
+  for (const val of Object.values(inputs)) {
+    if (typeof val === "string") { const s = val.trim(); if (s.length >= 4 && looksLikePromptText(s)) pieces.push(s); }
+  }
+  if (pieces.length) return pieces.join(" ");
+  for (const val of Object.values(inputs)) {
+    if (isLinkRef(val)) { const up = resolveTextFromNode(val[0], graph, v2, depth+1); if (up) return up; }
+  }
+  return "";
+}
+function resolveEncoderText(node, graph) {
+  const inputs = node.inputs;
+  if (!inputs || typeof inputs !== "object") return "";
+  for (const f of COMFY_PROMPT_INPUT_FIELDS) {
+    if (!(f in inputs)) continue;
+    const val = inputs[f];
+    if (typeof val === "string") { const s = val.trim(); if (s.length >= 4 && looksLikePromptText(s)) return s; }
+    else if (isLinkRef(val)) { const t = resolveTextFromNode(val[0], graph, new Set(), 0); if (t && looksLikePromptText(t)) return t; }
+  }
+  return "";
+}
+function extractPromptsFromComfyGraph(graphObj) {
+  if (typeof graphObj === "string") { try { graphObj = JSON.parse(graphObj); } catch (_) { return []; } }
+  if (!graphObj || typeof graphObj !== "object" || Array.isArray(graphObj)) return [];
+  if (graphObj.prompt && typeof graphObj.prompt === "object" && !Array.isArray(graphObj.prompt)) graphObj = graphObj.prompt;
+  const graph = {};
+  for (const [nid, node] of Object.entries(graphObj)) {
+    if (node && typeof node === "object" && "class_type" in node) graph[String(nid)] = node;
+  }
+  const enc = [];
+  for (const node of Object.values(graph)) {
+    const ct = node.class_type || "";
+    if (!nodeMatches(ct, COMFY_ENCODER_HINTS)) continue;
+    const t = resolveEncoderText(node, graph);
+    if (t) enc.push(t);
+  }
+  if (enc.length) {
+    const seen = new Set(); const out = [];
+    for (const t of enc) if (!seen.has(t)) { seen.add(t); out.push(t); }
+    return out;
+  }
+  const candidates = [];
+  const allHints = COMFY_PROMPT_CLASS_HINTS;
+  for (const node of Object.values(graph)) {
+    const ct = node.class_type || "";
+    const inputs = node.inputs;
+    if (!inputs || typeof inputs !== "object") continue;
+    let priority = allHints.findIndex(h => ct.indexOf(h) !== -1);
+    if (priority === -1) {
+      if (!nodeMatches(ct, COMFY_TEXT_SOURCE_HINTS)) continue;
+      priority = allHints.length;
+    }
+    for (const f of COMFY_PROMPT_INPUT_FIELDS) {
+      const val = inputs[f];
+      if (typeof val === "string") {
+        const s = val.trim();
+        if (s.length >= 8 && looksLikePromptText(s)) { candidates.push([priority, -s.length, s]); break; }
+      }
+    }
+  }
+  candidates.sort((a,b) => a[0]-b[0] || a[1]-b[1]);
+  const seen = new Set(); const out = [];
+  for (const [,,t] of candidates) if (!seen.has(t)) { seen.add(t); out.push(t); }
+  return out;
+}
+function hasMeaningfulString(values) {
+  if (!Array.isArray(values)) return false;
+  for (const v of values) {
+    if (typeof v === "string" && v.trim().length >= 4) return true;
+    if (Array.isArray(v)) for (const inner of v) if (typeof inner === "string" && inner.trim().length >= 4) return true;
+  }
+  return false;
+}
+function extractPromptsFromUiWorkflow(obj) {
+  if (typeof obj === "string") { try { obj = JSON.parse(obj); } catch (_) { return []; } }
+  if (!obj || typeof obj !== "object") return [];
+  const nodes = obj.nodes;
+  if (!Array.isArray(nodes)) return [];
+  const out = []; const seen = new Set();
+  const push = (t) => {
+    const s = (t || "").trim();
+    if (s.length < 4 || seen.has(s)) return;
+    if (!looksLikePromptText(s)) return;
+    seen.add(s); out.push(s);
+  };
+  const harvest = (values) => {
+    if (!Array.isArray(values)) return;
+    for (const v of values) {
+      if (typeof v === "string") push(v);
+      else if (Array.isArray(v)) for (const inner of v) if (typeof inner === "string") push(inner);
+    }
+  };
+  const encoderHits = [], sourceHits = [];
+  let hasWiredEncoder = false;
+  for (const n of nodes) {
+    if (!n || typeof n !== "object") continue;
+    const ct = n.type || "";
+    if (typeof ct !== "string") continue;
+    const wv = n.widgets_values;
+    if (nodeMatches(ct, COMFY_ENCODER_HINTS)) { encoderHits.push(wv); if (!hasMeaningfulString(wv)) hasWiredEncoder = true; }
+    else if (nodeMatches(ct, COMFY_TEXT_SOURCE_HINTS)) sourceHits.push(wv);
+  }
+  for (const wv of encoderHits) harvest(wv);
+  if (!out.length || hasWiredEncoder) for (const wv of sourceHits) harvest(wv);
+  return out;
+}
+function looksLikeComfyGraph(s) {
+  let obj = s;
+  if (typeof obj === "string") {
+    const st = obj.trimStart();
+    if (!st.startsWith("{")) return false;
+    try { obj = JSON.parse(st); } catch (_) { return false; }
+  }
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false;
+  if (obj.prompt && typeof obj.prompt === "object" && !Array.isArray(obj.prompt)) return true;
+  for (const v of Object.values(obj)) if (v && typeof v === "object" && "class_type" in v) return true;
+  if (Array.isArray(obj.nodes) && obj.nodes.length) for (const n of obj.nodes) if (n && typeof n === "object" && "type" in n) return true;
+  return false;
+}
+function extractPromptsFromInfo(info) {
+  const out = []; const seen = new Set();
+  const push = (t) => {
+    const s = (t || "").trim();
+    if (!s || seen.has(s)) return;
+    if (!looksLikePromptText(s)) return;
+    seen.add(s); out.push(s);
+  };
+  const params = info.parameters ?? info.Parameters;
+  if (typeof params === "string" && params.trim()) {
+    const pos = stripA1111(params);
+    if (pos) push(pos);
+  }
+  const cpr = info.prompt;
+  if (cpr) {
+    if (typeof cpr === "string" && !looksLikeComfyGraph(cpr)) push(cpr.trim());
+    else for (const t of extractPromptsFromComfyGraph(cpr)) push(t);
+  }
+  const cwf = info.workflow;
+  if (cwf) {
+    let parsed = cwf;
+    if (typeof parsed === "string") { try { parsed = JSON.parse(parsed); } catch (_) { parsed = null; } }
+    if (parsed && typeof parsed === "object") {
+      if (Array.isArray(parsed.nodes)) for (const t of extractPromptsFromUiWorkflow(parsed)) push(t);
+      else for (const t of extractPromptsFromComfyGraph(parsed)) push(t);
+    } else if (typeof cwf === "string" && looksLikeComfyGraph(cwf)) {
+      for (const t of extractPromptsFromComfyGraph(cwf)) push(t);
+    }
+  }
+  const consumed = new Set(["parameters","Parameters","prompt","workflow"]);
+  for (const [k, v] of Object.entries(info)) {
+    if (typeof k !== "string" || consumed.has(k)) continue;
+    const kl = k.toLowerCase();
+    if (!kl.includes("prompt")) continue;
+    if (kl.endsWith("_enhanced") || kl.endsWith("_count") || kl.endsWith("_json")) continue;
+    if (typeof v !== "string") continue;
+    const s = v.trim();
+    if (s.length < 8) continue;
+    const sl = s.toLowerCase();
+    if (sl === "true" || sl === "false" || sl === "none" || sl === "null") continue;
+    push(s);
+  }
+  if (!out.length && typeof info._exif_user_comment === "string") {
+    const uc = info._exif_user_comment;
+    const pos = stripA1111(uc);
+    if (pos) push(pos);
+    else if (uc.trim()) push(uc.trim());
+  }
+  return out;
+}
+
+// PNG chunk + JPEG EXIF reading
+function latin1Decode(u8) { let s = ""; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return s; }
+async function inflateDeflate(u8) {
+  if (typeof DecompressionStream === "undefined") throw new Error("no DS");
+  const ds = new DecompressionStream("deflate");
+  const stream = new Blob([u8]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function readPngTextChunks(file) {
+  const slice = file.slice(0, Math.min(file.size, PNG_TEXT_MAX_SCAN));
+  const buf = await slice.arrayBuffer();
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  if (u8.length < 8 || dv.getUint32(0, false) !== 0x89504E47) return {};
+  const out = {};
+  let off = 8;
+  while (off + 8 <= u8.length) {
+    const len = dv.getUint32(off, false);
+    const type = String.fromCharCode(u8[off+4],u8[off+5],u8[off+6],u8[off+7]);
+    off += 8;
+    if (len > 128 * 1024 * 1024) break;
+    const end = off + len;
+    if (end + 4 > u8.length) break;
+    const data = u8.subarray(off, end);
+    if (type === "tEXt") {
+      const nz = data.indexOf(0);
+      if (nz > 0) { out[latin1Decode(data.subarray(0,nz))] = latin1Decode(data.subarray(nz+1)); }
+    } else if (type === "zTXt") {
+      const nz = data.indexOf(0);
+      if (nz > 0 && nz + 2 <= data.length) {
+        try { out[latin1Decode(data.subarray(0,nz))] = latin1Decode(await inflateDeflate(data.subarray(nz+2))); } catch (_) {}
+      }
+    } else if (type === "iTXt") {
+      const nz = data.indexOf(0);
+      if (nz > 0 && nz + 5 <= data.length) {
+        const key = latin1Decode(data.subarray(0,nz));
+        const cflag = data[nz+1];
+        let p = nz + 3;
+        const langEnd = data.indexOf(0, p);
+        if (langEnd >= 0) {
+          p = langEnd + 1;
+          const tkEnd = data.indexOf(0, p);
+          if (tkEnd >= 0) {
+            p = tkEnd + 1;
+            const payload = data.subarray(p);
+            try {
+              const bytes = (cflag === 1) ? await inflateDeflate(payload) : payload;
+              out[key] = new TextDecoder("utf-8", { fatal:false }).decode(bytes);
+            } catch (_) {}
+          }
+        }
+      }
+    } else if (type === "IEND") break;
+    off = end + 4;
+  }
+  return out;
+}
+function parseExifUserComment(u8, base, end) {
+  if (base + 8 > end) return "";
+  const bo = String.fromCharCode(u8[base], u8[base+1]);
+  const little = bo === "II";
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const g16 = o => dv.getUint16(o, little);
+  const g32 = o => dv.getUint32(o, little);
+  if (g16(base+2) !== 0x002A) return "";
+  const ifd0 = base + g32(base+4);
+  if (ifd0 + 2 > end) return "";
+  const num = g16(ifd0);
+  let exifIfd = 0;
+  for (let i = 0; i < num; i++) {
+    const e = ifd0 + 2 + i*12;
+    if (e + 12 > end) break;
+    if (g16(e) === 0x8769) { exifIfd = base + g32(e+8); break; }
+  }
+  if (!exifIfd || exifIfd + 2 > end) return "";
+  const n2 = g16(exifIfd);
+  for (let i = 0; i < n2; i++) {
+    const e = exifIfd + 2 + i*12;
+    if (e + 12 > end) break;
+    if (g16(e) !== 0x9286) continue;
+    const count = g32(e+4);
+    const valOff = count <= 4 ? e + 8 : base + g32(e+8);
+    if (valOff + count > end || count < 8) return "";
+    const raw = u8.subarray(valOff, valOff + count);
+    const header = String.fromCharCode(raw[0],raw[1],raw[2],raw[3],raw[4]);
+    const body = raw.subarray(8);
+    const strip = s => s.replace(/\0+$/,"").trim();
+    if (header.startsWith("ASCII")) return strip(new TextDecoder("utf-8",{fatal:false}).decode(body));
+    if (header.startsWith("UNICO")) {
+      try { return strip(new TextDecoder("utf-16be").decode(body)); }
+      catch (_) { try { return strip(new TextDecoder("utf-16le").decode(body)); } catch (_) { return ""; } }
+    }
+    return strip(new TextDecoder("utf-8",{fatal:false}).decode(body));
+  }
+  return "";
+}
+async function readJpegMetadata(file) {
+  const slice = file.slice(0, Math.min(file.size, JPEG_META_MAX));
+  const buf = await slice.arrayBuffer();
+  const u8 = new Uint8Array(buf);
+  const info = {};
+  if (u8[0] !== 0xFF || u8[1] !== 0xD8) return info;
+  let off = 2;
+  while (off + 4 < u8.length) {
+    if (u8[off] !== 0xFF) return info;
+    while (off < u8.length && u8[off] === 0xFF) off++;
+    const marker = u8[off++];
+    if (marker === 0xD9 || marker === 0xDA) return info;
+    if (off + 1 >= u8.length) return info;
+    const segLen = (u8[off]<<8) | u8[off+1];
+    if (segLen < 2) return info;
+    const segEnd = off + segLen;
+    if (segEnd > u8.length) return info;
+    if (marker === 0xE1 && segEnd - off >= 8) {
+      if (u8[off+2]===0x45 && u8[off+3]===0x78 && u8[off+4]===0x69 && u8[off+5]===0x66) {
+        const uc = parseExifUserComment(u8, off + 8, segEnd);
+        if (uc) info._exif_user_comment = uc;
+      }
+    }
+    off = segEnd;
+  }
+  return info;
+}
+async function extractPromptsForFile(file) {
+  const name = (file.name || "").toLowerCase();
+  try {
+    if (name.endsWith(".png")) return extractPromptsFromInfo(await readPngTextChunks(file));
+    if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return extractPromptsFromInfo(await readJpegMetadata(file));
+    return [];
+  } catch (_) { return []; }
+}
+function ensurePrompts(i) {
+  if (prompts[i]) return Promise.resolve(prompts[i]);
+  if (promptsP[i]) return promptsP[i];
+  promptsP[i] = (async () => {
+    try {
+      const f = await getFileForEntry(files[i]);
+      const list = await extractPromptsForFile(f);
+      prompts[i] = list;
+      return list;
+    } catch (_) { prompts[i] = []; return prompts[i]; }
+  })();
+  return promptsP[i];
+}
+
+// =====================================================================
+// Color signature
+// =====================================================================
+const COLOR_KERNEL = (() => {
+  const k = new Float32Array(1024);
+  const sigma = 10, two_s2 = 2*sigma*sigma;
+  let sum = 0;
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const dx = x-16, dy = y-16;
+    const w = Math.exp(-(dx*dx + dy*dy)/two_s2);
+    k[y*32+x] = w; sum += w;
+  }
+  for (let i = 0; i < 1024; i++) k[i] /= sum;
+  return k;
+})();
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g-b)/d + (g<b?6:0)); break;
+      case g: h = ((b-r)/d + 2); break;
+      case b: h = ((r-g)/d + 4); break;
+    }
+    h *= 60;
+  }
+  return { h, s, l };
+}
+const COLOR_BUCKETS = [
+  { key:"neutral", label:"Neutral", swatch:"#808080" },
+  { key:"h0",   label:"Red",     swatch:"#dd3c3c" },
+  { key:"h30",  label:"Orange",  swatch:"#dd8c3c" },
+  { key:"h60",  label:"Yellow",  swatch:"#dddd3c" },
+  { key:"h90",  label:"Lime",    swatch:"#8cdd3c" },
+  { key:"h120", label:"Green",   swatch:"#3cdd3c" },
+  { key:"h150", label:"Mint",    swatch:"#3cdd8c" },
+  { key:"h180", label:"Cyan",    swatch:"#3cdddd" },
+  { key:"h210", label:"Azure",   swatch:"#3c8cdd" },
+  { key:"h240", label:"Blue",    swatch:"#3c3cdd" },
+  { key:"h270", label:"Violet",  swatch:"#8c3cdd" },
+  { key:"h300", label:"Magenta", swatch:"#dd3cdd" },
+  { key:"h330", label:"Pink",    swatch:"#dd3c8c" },
+];
+function computeColorSignature(imgOrBitmap) {
+  try {
+    const useOff = typeof OffscreenCanvas !== "undefined";
+    const canvas = useOff ? new OffscreenCanvas(32,32) : Object.assign(document.createElement("canvas"), { width:32, height:32 });
+    const ctx = canvas.getContext("2d", { willReadFrequently:true });
+    if (!ctx) return null;
+    ctx.drawImage(imgOrBitmap, 0, 0, 32, 32);
+    const data = ctx.getImageData(0, 0, 32, 32).data;
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < 1024; i++) {
+      const w = COLOR_KERNEL[i], p = i * 4;
+      r += data[p]*w; g += data[p+1]*w; b += data[p+2]*w;
+    }
+    const hsl = rgbToHsl(r, g, b);
+    let bucket;
+    if (hsl.s < 0.15 || hsl.l < 0.08 || hsl.l > 0.92) bucket = "neutral";
+    else bucket = "h" + (Math.floor(((hsl.h % 360) + 360) % 360 / 30) * 30);
+    return { h: hsl.h, s: hsl.s, l: hsl.l, bucket };
+  } catch (_) { return null; }
+}
+function matchesColorFilter(color, sel) {
+  if (!sel || sel.size === 0) return true;
+  if (color == null) return true;
+  return sel.has(color.bucket);
+}
+
+// =====================================================================
+// Filter/sort state + pipeline
+// =====================================================================
+const filterState = (() => {
+  const d = {
+    sortBy:'name', sortDir:'asc', query:'', formats:null,
+    orientation:'all', colors:new Set(), keyword:'',
+    favoritesOnly:false, randomSeed:1,
+  };
+  try {
+    const raw = localStorage.getItem('fast_gallery_view');
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p.sortBy) d.sortBy = p.sortBy;
+      if (p.sortDir) d.sortDir = p.sortDir;
+      if (typeof p.query === 'string') d.query = p.query;
+      if (Array.isArray(p.formats)) d.formats = new Set(p.formats);
+      if (p.orientation) d.orientation = p.orientation;
+      if (Array.isArray(p.colors)) d.colors = new Set(p.colors);
+      if (typeof p.keyword === 'string') d.keyword = p.keyword;
+      if (typeof p.favoritesOnly === 'boolean') d.favoritesOnly = p.favoritesOnly;
+    }
+  } catch (_) {}
+  return d;
+})();
+function saveFilterState() {
+  try {
+    localStorage.setItem('fast_gallery_view', JSON.stringify({
+      sortBy:filterState.sortBy, sortDir:filterState.sortDir,
+      query:filterState.query,
+      formats:filterState.formats ? Array.from(filterState.formats) : null,
+      orientation:filterState.orientation,
+      colors:Array.from(filterState.colors),
+      keyword:filterState.keyword,
+      favoritesOnly:filterState.favoritesOnly,
+    }));
+  } catch (_) {}
+}
+
+function PromptKeywordFilter() {
+  let terms = [];
+  return {
+    setTerms(text) {
+      const seen = new Set(); const out = [];
+      for (const raw of String(text || "").split(/\s+/)) {
+        if (!raw) continue;
+        const t = raw.toLowerCase();
+        if (!seen.has(t)) { seen.add(t); out.push(t); }
+      }
+      terms = out;
+    },
+    matches(list) {
+      if (!terms.length) return true;
+      if (list == null) return null;
+      if (!Array.isArray(list) || !list.length) return false;
+      const hay = list.join("\n").toLowerCase();
+      for (const t of terms) if (hay.indexOf(t) === -1) return false;
+      return true;
+    },
+  };
+}
+const PromptKW = PromptKeywordFilter();
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = a;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function buildView() {
+  let out = new Array(files.length);
+  for (let i = 0; i < files.length; i++) out[i] = i;
+  if (filterState.formats) {
+    const fm = filterState.formats;
+    out = out.filter(i => fm.has(files[i].ext));
+  }
+  if (filterState.query) {
+    const q = filterState.query.toLowerCase();
+    out = out.filter(i => files[i].path.toLowerCase().includes(q));
+  }
+  if (filterState.orientation !== 'all') {
+    const o = filterState.orientation;
+    out = out.filter(i => {
+      const d = dims[i]; if (!d) return true;
+      const r = d.w / d.h;
+      if (o === 'portrait') return r < 0.95;
+      if (o === 'landscape') return r > 1.05;
+      return r >= 0.95 && r <= 1.05;
+    });
+  }
+  if (filterState.colors.size > 0) {
+    out = out.filter(i => matchesColorFilter(colors[i], filterState.colors));
+  }
+  if (filterState.keyword) {
+    PromptKW.setTerms(filterState.keyword);
+    out = out.filter(i => PromptKW.matches(prompts[i]) !== false);
+  }
+  if (filterState.favoritesOnly) {
+    out = out.filter(i => favorites.has(files[i].path));
+  }
+  const dir = filterState.sortDir === 'desc' ? -1 : 1;
+  const sb = filterState.sortBy;
+  if (sb === 'random') {
+    const seed = filterState.randomSeed >>> 0;
+    const keys = new Map();
+    for (const i of out) keys.set(i, mulberry32(seed ^ i)());
+    out.sort((a,b) => (keys.get(a) - keys.get(b)) * dir);
+  } else if (sb === 'name') {
+    out.sort((a,b) => files[a].path.localeCompare(files[b].path) * dir);
+  } else {
+    const k = i => {
+      if (sb === 'date') return files[i].lastModified || 0;
+      if (sb === 'size') return files[i].size || 0;
+      if (sb === 'width') return dims[i]?.w || 0;
+      if (sb === 'height') return dims[i]?.h || 0;
+      if (sb === 'area') return (dims[i]?.w||0) * (dims[i]?.h||0);
+      return 0;
+    };
+    out.sort((a,b) => (k(a) - k(b)) * dir);
+  }
+  return out;
+}
+
+async function ensureSortDataFor(sortBy) {
+  if (sortBy !== 'date' && sortBy !== 'size') return;
+  const field = sortBy === 'date' ? 'lastModified' : 'size';
+  if (!files.some(e => e[field] == null)) return;
+  await mapLimit(files.slice(), 32, async (entry) => {
+    if (entry[field] != null) return;
+    const f = await getFileForEntry(entry).catch(() => null);
+    if (f) { entry.size = f.size; entry.lastModified = f.lastModified; }
+  });
+}
+
+function applyFilters() {
+  view = buildView();
+  viewCountEl.textContent = String(view.length);
+  viewCountWrap.style.display = files.length ? "block" : "none";
+  rebuildLayout(true);
+}
+
+// =====================================================================
+// Virtualized masonry
+// =====================================================================
+let slots = [];
+let slotsByTop = [];
+const mounted = new Map();
+const pool = [];
+let pendingFrame = 0;
+
+function pickShortest(colHeights) {
+  let best = 0, bestH = colHeights[0];
+  for (let i = 1; i < colHeights.length; i++) if (colHeights[i] < bestH) { bestH = colHeights[i]; best = i; }
+  return best;
+}
+
+function computeLayout() {
+  const W = grid.clientWidth || 0;
+  const maxPossible = Math.max(1, Math.floor((W + GAP) / (MIN_COL_W + GAP)));
+  const cols = Math.max(1, Math.min(desiredCols, 8, maxPossible));
+  const colW = Math.floor((W - GAP * (cols - 1)) / cols);
+  return { cols, colW, GAP };
+}
+
+function computeSlots() {
+  const { cols, colW } = computeLayout();
+  const colHeights = new Array(cols).fill(0);
+  slots = new Array(view.length);
+  for (let k = 0; k < view.length; k++) {
+    const idx = view[k];
+    const d = dims[idx] || { w:1, h:1 };
+    const col = pickShortest(colHeights);
+    const left = col * (colW + GAP);
+    const top  = colHeights[col];
+    const height = Math.max(90, Math.round(colW * (d.h / d.w)));
+    slots[k] = { k, index: idx, col, left, top, width: colW, height };
+    colHeights[col] = top + height + GAP;
+  }
+  let maxH = 0;
+  for (const h of colHeights) if (h > maxH) maxH = h;
+  grid.style.height = (maxH ? maxH - GAP : 0) + "px";
+  slotsByTop = slots.slice().sort((a,b) => a.top - b.top);
+}
+
+function firstVisibleSlotIndex(scrollY) {
+  const target = scrollY - 1200;
+  let lo = 0, hi = slotsByTop.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    const s = slotsByTop[mid];
+    if (s.top + s.height >= target) hi = mid; else lo = mid + 1;
+  }
+  return lo;
+}
+
+function makeTileNode() {
+  const tile = document.createElement('div');
+  tile.className = 'tile';
+  const img = document.createElement('img');
+  img.className = 'thumb';
+  img.decoding = 'async';
+  const num = document.createElement('div'); num.className = 'num';
+  const dim = document.createElement('div'); dim.className = 'dim';
+  const pchip = document.createElement('div'); pchip.className = 'pchip'; pchip.textContent = 'P';
+  const star = document.createElement('div'); star.className = 'star'; star.textContent = '★';
+  const selWrap = document.createElement('div'); selWrap.className = 'selWrap';
+  const sel = document.createElement('input'); sel.type = 'checkbox'; sel.className = 'sel';
+  selWrap.appendChild(sel);
+  const dl = document.createElement('button');
+  dl.type = 'button'; dl.className = 'dl'; dl.title = 'Download';
+  dl.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M12 3v10m0 0 4-4m-4 4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3h16v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  tile.appendChild(img); tile.appendChild(num); tile.appendChild(dim);
+  tile.appendChild(pchip); tile.appendChild(star); tile.appendChild(selWrap); tile.appendChild(dl);
+  return tile;
+}
+
+function applyTileData(node, slot) {
+  const i = slot.index;
+  const entry = files[i];
+  node.dataset.index = String(i);
+  node.dataset.k = String(slot.k);
+  node.dataset.selected = selected.has(i) ? "1" : "0";
+  node.dataset.hasprompt = (prompts[i] && prompts[i].length) ? "1" : "0";
+  node.dataset.fav = favorites.has(entry.path) ? "1" : "0";
+
+  const img = node.querySelector('img.thumb');
+  const num = node.querySelector('.num');
+  const dim = node.querySelector('.dim');
+  const sel = node.querySelector('.sel');
+  num.textContent = String(i + 1);
+  dim.textContent = fmtDims(dims[i] || null);
+  sel.checked = selected.has(i);
+  sel.dataset.index = String(i);
+
+  loadThumbForNode(node, i, img);
+}
+
+function resetTileNode(node) {
+  const img = node.querySelector('img.thumb');
+  if (img) {
+    if (img._objectUrl) { try { URL.revokeObjectURL(img._objectUrl); } catch (_) {} img._objectUrl = null; }
+    img.removeAttribute('src');
+    img._loadedForIndex = -1;
+  }
+}
+
+function loadThumbForNode(node, i, img) {
+  if (img._loadedForIndex === i && img.src) return;
+  img._loadedForIndex = i;
+  if (img._objectUrl) { try { URL.revokeObjectURL(img._objectUrl); } catch (_) {} img._objectUrl = null; }
+  (async () => {
+    try {
+      const file = await getFileForEntry(files[i]);
+      if (img._loadedForIndex !== i) return;
+      const url = URL.createObjectURL(file);
+      img._objectUrl = url;
+      img.alt = files[i].name;
+      img.src = url;
+      img.addEventListener('load', async () => {
+        try { if (img.decode) await img.decode(); } catch (_) {}
+        if (!colors[i]) {
+          const sig = computeColorSignature(img);
+          if (sig) colors[i] = sig;
+        }
+      }, { once:true });
+    } catch (_) {}
+  })();
+}
+
+function renderVisible() {
+  if (!slotsByTop.length) {
+    for (const [, node] of mounted) {
+      if (node.parentNode) node.parentNode.removeChild(node);
+      resetTileNode(node);
+      if (pool.length < 300) pool.push(node);
+    }
+    mounted.clear();
+    return;
+  }
+  const overscan = 1200;
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  const topPx = scrollY - overscan;
+  const bottomPx = scrollY + window.innerHeight + overscan;
+  const seen = new Set();
+  const start = firstVisibleSlotIndex(scrollY);
+  for (let i = start; i < slotsByTop.length; i++) {
+    const slot = slotsByTop[i];
+    if (slot.top > bottomPx) break;
+    if (slot.top + slot.height < topPx) continue;
+    seen.add(slot.k);
+    let node = mounted.get(slot.k);
+    if (!node) {
+      node = pool.pop() || makeTileNode();
+      mounted.set(slot.k, node);
+    }
+    node.style.left   = slot.left  + "px";
+    node.style.top    = slot.top   + "px";
+    node.style.width  = slot.width + "px";
+    node.style.height = slot.height + "px";
+    applyTileData(node, slot);
+    if (!node.isConnected) grid.appendChild(node);
+  }
+  for (const [k, node] of mounted) {
+    if (seen.has(k)) continue;
+    mounted.delete(k);
+    if (node.parentNode) node.parentNode.removeChild(node);
+    resetTileNode(node);
+    if (pool.length < 300) pool.push(node);
+  }
+}
+
+function onScrollOrResize() {
+  if (pendingFrame) return;
+  pendingFrame = requestAnimationFrame(() => {
+    pendingFrame = 0;
+    renderVisible();
+  });
+}
+
+function saveScrollAnchor() {
+  const scrollY = window.scrollY || 0;
+  const start = firstVisibleSlotIndex(scrollY);
+  for (let i = start; i < slotsByTop.length; i++) {
+    const s = slotsByTop[i];
+    if (mounted.has(s.k)) return { index: s.index, offsetY: s.top - scrollY };
+  }
+  return null;
+}
+function restoreScrollAnchor(anchor) {
+  if (!anchor) return;
+  let slot = null;
+  for (let i = 0; i < slots.length; i++) if (slots[i].index === anchor.index) { slot = slots[i]; break; }
+  if (!slot) return;
+  window.scrollTo(0, Math.max(0, slot.top - anchor.offsetY));
+}
+
+function rebuildLayout(preserveScroll = true) {
+  const anchor = preserveScroll ? saveScrollAnchor() : null;
+  for (const [, node] of mounted) {
+    if (node.parentNode) node.parentNode.removeChild(node);
+    resetTileNode(node);
+    if (pool.length < 300) pool.push(node);
+  }
+  mounted.clear();
+  computeSlots();
+  if (anchor) restoreScrollAnchor(anchor);
+  renderVisible();
+}
+
+window.addEventListener('scroll', onScrollOrResize, { passive:true });
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    syncBarHeight();
+    if (files.length) rebuildLayout(true);
+    if (viewer.classList.contains('open')) { baseScale = computeBaseScale(); drawViewer(); updateViewerButtons(currentIndex); }
+  }, 120);
+});
+let _resizeTimer = null;
+
+// =====================================================================
+// Selection
+// =====================================================================
+function updateSelectionUI() {
+  const n = selected.size;
+  selCount.style.display = multiselect ? "block" : "none";
+  selCount.textContent = `${n} selected`;
+  dlAllBtn.style.display = (multiselect && n > 0) ? "inline-block" : "none";
+  syncBarHeight();
+}
+function setMultiselect(on) {
+  multiselect = !!on;
+  msSwitch.classList.toggle('on', multiselect);
+  msSwitch.setAttribute('aria-checked', multiselect ? "true" : "false");
+  document.body.classList.toggle('ms', multiselect);
+  if (!multiselect) selected.clear();
+  renderVisible();
+  updateSelectionUI();
+}
+function toggleSelectionIndex(i) {
+  if (!isValidIndex(i)) return;
+  if (selected.has(i)) selected.delete(i); else selected.add(i);
+  renderVisible();
+  updateSelectionUI();
+}
+
+// =====================================================================
+// Download
+// =====================================================================
+async function downloadIndex(i) {
+  if (!isValidIndex(i)) return;
+  try {
+    const f = await getFileForEntry(files[i]);
+    const url = URL.createObjectURL(f);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = dlNameForIndex(i);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 12000);
+  } catch (_) {}
+}
+
+// =====================================================================
+// Viewer (canvas)
+// =====================================================================
+let bmp = null, bmpW = 1, bmpH = 1, isFullRes = false;
+let zoomS = 1, baseScale = 1, panX = 0, panY = 0;
+const ZMIN = 1, ZMAX = 10;
+let dragging = false, dragStartX = 0, dragStartY = 0, dragStartPanX = 0, dragStartPanY = 0;
+
+function setZoomClasses() { viewer.classList.toggle('zoomed', zoomS > 1.0001); viewer.classList.toggle('dragging', dragging); }
+function stageRect() { const r = viewerStage.getBoundingClientRect(); return { w:r.width||1, h:r.height||1, left:r.left, top:r.top }; }
+function computeBaseScale() { const r = stageRect(); return Math.min(r.w / bmpW, r.h / bmpH); }
+function clampPan() {
+  if (zoomS <= 1.0001) { panX = 0; panY = 0; return; }
+  const r = stageRect(); const s = baseScale * zoomS;
+  const imgW = bmpW * s, imgH = bmpH * s;
+  const maxX = Math.max(0, (imgW - r.w)/2), maxY = Math.max(0, (imgH - r.h)/2);
+  panX = clamp(panX, -maxX, maxX); panY = clamp(panY, -maxY, maxY);
+}
+function resizeViewerCanvas() {
+  const r = stageRect();
+  const dpr = window.devicePixelRatio || 1;
+  const cw = Math.max(1, Math.floor(r.w * dpr));
+  const ch = Math.max(1, Math.floor(r.h * dpr));
+  if (viewerCanvas.width !== cw || viewerCanvas.height !== ch) { viewerCanvas.width = cw; viewerCanvas.height = ch; }
+}
+function drawViewer() {
+  if (!hasViewerCanvas) return;
+  resizeViewerCanvas();
+  const r = stageRect(); const dpr = window.devicePixelRatio || 1;
+  vctx.setTransform(dpr,0,0,dpr,0,0);
+  vctx.fillStyle = "#000"; vctx.fillRect(0, 0, r.w, r.h);
+  if (!bmp) return;
+  clampPan();
+  const s = baseScale * zoomS;
+  vctx.save();
+  vctx.translate(r.w/2 + panX, r.h/2 + panY);
+  vctx.scale(s, s);
+  vctx.drawImage(bmp, -bmpW/2, -bmpH/2);
+  vctx.restore();
+  setZoomClasses();
+}
+function zoomAt(cx, cy, factor) {
+  const r = stageRect();
+  const dx = cx - (r.left + r.w/2), dy = cy - (r.top + r.h/2);
+  const oldOverall = baseScale * zoomS;
+  let newOverall = clamp(oldOverall * factor, baseScale * ZMIN, baseScale * ZMAX);
+  if (newOverall === oldOverall) return;
+  const ix = (dx - panX) / oldOverall;
+  const iy = (dy - panY) / oldOverall;
+  panX = dx - ix * newOverall;
+  panY = dy - iy * newOverall;
+  zoomS = newOverall / baseScale;
+  drawViewer();
+}
+
+viewerStage.addEventListener('wheel', (e) => {
+  if (!viewer.classList.contains('open')) return;
+  e.preventDefault(); e.stopPropagation();
+  zoomAt(e.clientX, e.clientY, Math.pow(1.0015, -e.deltaY));
+}, { passive:false });
+viewerStage.addEventListener('pointerdown', (e) => {
+  if (!viewer.classList.contains('open')) return;
+  e.preventDefault(); e.stopPropagation();
+  if (zoomS <= 1.0001) return;
+  dragging = true;
+  dragStartX = e.clientX; dragStartY = e.clientY;
+  dragStartPanX = panX; dragStartPanY = panY;
+  try { viewerStage.setPointerCapture(e.pointerId); } catch (_) {}
+  setZoomClasses();
+});
+viewerStage.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  e.preventDefault(); e.stopPropagation();
+  panX = dragStartPanX + (e.clientX - dragStartX);
+  panY = dragStartPanY + (e.clientY - dragStartY);
+  drawViewer();
+});
+function endDrag(e) {
+  if (!dragging) return;
+  e.preventDefault(); e.stopPropagation();
+  dragging = false; setZoomClasses();
+  try { viewerStage.releasePointerCapture(e.pointerId); } catch (_) {}
+}
+viewerStage.addEventListener('pointerup', endDrag);
+viewerStage.addEventListener('pointercancel', endDrag);
+viewerStage.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+viewer.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+
+const decodeWorker = (() => {
+  if (!window.Worker || !window.createImageBitmap) return null;
+  const code = `
+    self.onmessage = async (e) => {
+      const { reqId, file, rw, rh, quality } = e.data;
+      try {
+        let bmp;
+        const opts = { imageOrientation: "from-image" };
+        if (rw && rh) {
+          try { bmp = await createImageBitmap(file, { ...opts, resizeWidth:rw, resizeHeight:rh, resizeQuality: quality||"high" }); }
+          catch (err) { bmp = await createImageBitmap(file, opts); }
+        } else { bmp = await createImageBitmap(file, opts); }
+        self.postMessage({ reqId, ok:true, bmp, w:bmp.width, h:bmp.height }, [bmp]);
+      } catch (err) { self.postMessage({ reqId, ok:false, error:String(err) }); }
+    };
+  `;
+  const blob = new Blob([code], { type:"application/javascript" });
+  const url = URL.createObjectURL(blob);
+  const w = new Worker(url); w._url = url; return w;
+})();
+let decodeReqId = 0, activeReqId = 0;
+function closeBitmap(b) { try { if (b && b.close) b.close(); } catch (_) {} }
+function setBadge(text, show) { viewerBadge.textContent = text || ""; viewerBadge.classList.toggle('show', !!show); }
+function computePreviewResize(i) {
+  const d = dims[i] || { w:1, h:1 };
+  const r = stageRect();
+  const dpr = window.devicePixelRatio || 1;
+  const screenMax = Math.max(r.w, r.h) * dpr * PREVIEW_OVERSAMPLE;
+  const maxEdge = Math.min(PREVIEW_MAX_DIM, Math.max(512, Math.floor(screenMax)));
+  const scaleEdge = maxEdge / Math.max(d.w, d.h);
+  const scalePix = Math.sqrt(PREVIEW_MAX_PIXELS / Math.max(1, d.w * d.h));
+  const s = Math.min(1, scaleEdge, scalePix);
+  const rw = Math.max(1, Math.floor(d.w * s));
+  const rh = Math.max(1, Math.floor(d.h * s));
+  return { rw, rh, downscaled: (rw < d.w) || (rh < d.h) };
+}
+
+async function startDecode(i, wantFullRes) {
+  if (!hasViewerCanvas || !isValidIndex(i)) return;
+  activeReqId = ++decodeReqId;
+  const reqId = activeReqId;
+  viewer.classList.add('loading');
+  closeBitmap(bmp);
+  bmp = null; bmpW = 1; bmpH = 1;
+  drawViewer();
+  let file;
+  try { file = await getFileForEntry(files[i]); } catch (_) { viewer.classList.remove('loading'); setBadge("Decode failed", true); return; }
+  if (!decodeWorker) {
+    try {
+      let b;
+      const opts = { imageOrientation:"from-image" };
+      if (!wantFullRes && window.createImageBitmap) {
+        const pr = computePreviewResize(i);
+        try { b = await createImageBitmap(file, { ...opts, resizeWidth:pr.rw, resizeHeight:pr.rh, resizeQuality:"high" }); }
+        catch (_) { b = await createImageBitmap(file, opts); }
+        isFullRes = !pr.downscaled;
+      } else { b = await createImageBitmap(file, opts); isFullRes = true; }
+      if (reqId !== activeReqId) { closeBitmap(b); return; }
+      bmp = b; bmpW = b.width; bmpH = b.height;
+      const d = dims[i];
+      if (d && d.w > 1 && d.h > 1) isFullRes = (bmpW === d.w && bmpH === d.h);
+      viewer.classList.remove('loading');
+      baseScale = computeBaseScale();
+      zoomS = 1; panX = 0; panY = 0; dragging = false;
+      drawViewer();
+      updateViewerButtons(i);
+    } catch (_) { viewer.classList.remove('loading'); setBadge("Decode failed", true); }
+    return;
+  }
+  const msg = wantFullRes ? { reqId, file, rw:0, rh:0, quality:"high" }
+                          : ((pr) => { isFullRes = !pr.downscaled; return { reqId, file, rw:pr.rw, rh:pr.rh, quality:"high" }; })(computePreviewResize(i));
+  if (wantFullRes) isFullRes = true;
+  decodeWorker.postMessage(msg);
+}
+if (decodeWorker) {
+  decodeWorker.onmessage = (e) => {
+    const { reqId, ok, bmp:b, w, h } = e.data || {};
+    if (reqId !== activeReqId) { if (ok) closeBitmap(b); return; }
+    if (!viewer.classList.contains('open')) { if (ok) closeBitmap(b); return; }
+    if (!ok) { viewer.classList.remove('loading'); setBadge("Decode failed", true); return; }
+    bmp = b; bmpW = w || b.width || 1; bmpH = h || b.height || 1;
+    const d = dims[currentIndex];
+    if (d && d.w > 1 && d.h > 1) isFullRes = (bmpW === d.w && bmpH === d.h);
+    viewer.classList.remove('loading');
+    baseScale = computeBaseScale();
+    zoomS = 1; panX = 0; panY = 0; dragging = false;
+    drawViewer();
+    updateViewerButtons(currentIndex);
+  };
+}
+
+function updateViewerButtons(i) {
+  if (!isValidIndex(i)) return;
+  const d = dims[i] || null;
+  viewerDims.textContent = fmtDims(d);
+  let needPreview = false;
+  if (d) needPreview = computePreviewResize(i).downscaled;
+  viewerFull.style.display = needPreview ? "inline-flex" : "none";
+  viewerFull.disabled = isFullRes;
+  if (needPreview) setBadge(isFullRes ? "Full-res" : "Preview", true);
+  else setBadge("", false);
+}
+
+// Prompt panel
+function renderPromptPanel(i) {
+  const list = prompts[i] || [];
+  if (!list.length) {
+    promptTextEl.textContent = "No prompt found in metadata.";
+    promptTextEl.classList.add("empty");
+    pcount.textContent = ""; pPrev.disabled = true; pNext.disabled = true;
+    viewerPrompt.classList.remove('on');
+    return;
+  }
+  if (currentPromptIdx >= list.length) currentPromptIdx = 0;
+  if (currentPromptIdx < 0) currentPromptIdx = list.length - 1;
+  promptTextEl.textContent = list[currentPromptIdx];
+  promptTextEl.classList.remove("empty");
+  pcount.textContent = list.length > 1 ? `${currentPromptIdx + 1} / ${list.length}` : "";
+  pPrev.disabled = list.length <= 1;
+  pNext.disabled = list.length <= 1;
+}
+function showPromptPanel(on) {
+  showingPromptPanel = !!on;
+  viewer.classList.toggle('showPrompt', showingPromptPanel);
+  viewerPrompt.classList.toggle('on', showingPromptPanel && (prompts[currentIndex]?.length || 0) > 0);
+}
+async function loadAndShowPrompts(i, autoShow) {
+  viewerPrompt.disabled = true;
+  viewerPrompt.textContent = "Loading…";
+  try {
+    const list = await ensurePrompts(i);
+    if (i !== currentIndex) return;
+    currentPromptIdx = 0;
+    renderPromptPanel(i);
+    viewerPrompt.textContent = list.length ? (list.length > 1 ? `Prompts (${list.length})` : "Prompt") : "No prompt";
+    viewerPrompt.disabled = false;
+    if (autoShow && list.length) showPromptPanel(true);
+    else viewerPrompt.classList.toggle('on', showingPromptPanel && list.length > 0);
+    renderVisible();
+  } catch (_) { viewerPrompt.textContent = "Prompt"; viewerPrompt.disabled = false; }
+}
+
+function updateFavButton() {
+  if (!isValidIndex(currentIndex)) return;
+  const on = favorites.has(files[currentIndex].path);
+  viewerFav.textContent = on ? "★" : "☆";
+  viewerFav.classList.toggle('fav-on', on);
+}
+async function toggleFavForCurrent() {
+  if (!isValidIndex(currentIndex)) return;
+  const p = files[currentIndex].path;
+  if (favorites.has(p)) favorites.delete(p); else favorites.add(p);
+  updateFavButton();
+  await saveFavoritesFor(rootKey, favorites);
+  renderVisible();
+}
+
+async function openViewer(i, viewPos) {
+  if (!hasViewerCanvas || !isValidIndex(i)) return;
+  currentIndex = i;
+  currentViewPos = (typeof viewPos === 'number') ? viewPos : view.indexOf(i);
+  if (currentViewPos < 0) currentViewPos = 0;
+
+  try { await ensureDims(i); } catch (_) {}
+  const path = files[i].path || files[i].name;
+  const total = view.length || files.length;
+  viewerTitle.textContent = `${currentViewPos + 1} / ${total} — ${path}`;
+  viewerDims.textContent = fmtDims(dims[i] || null);
+  viewer.classList.add('open');
+  viewer.setAttribute('aria-hidden', 'false');
+  lockScroll();
+  requestAnimationFrame(() => drawViewer());
+  isFullRes = false;
+  updateViewerButtons(i);
+  updateFavButton();
+  startDecode(i, false);
+  currentPromptIdx = 0;
+  showPromptPanel(false);
+  loadAndShowPrompts(i, false);
+}
+function closeViewer() {
+  viewer.classList.remove('open','loading','showPrompt');
+  viewer.setAttribute('aria-hidden', 'true');
+  activeReqId = ++decodeReqId;
+  closeBitmap(bmp); bmp = null; bmpW = 1; bmpH = 1;
+  setBadge("", false);
+  unlockScroll();
+  zoomS = 1; panX = 0; panY = 0; dragging = false;
+  drawViewer();
+  currentIndex = -1;
+  showingPromptPanel = false;
+}
+function nextInView() {
+  if (!view.length) return;
+  const p = (currentViewPos + 1) % view.length;
+  openViewer(view[p], p);
+}
+function prevInView() {
+  if (!view.length) return;
+  const p = (currentViewPos - 1 + view.length) % view.length;
+  openViewer(view[p], p);
+}
+
+viewerClose.addEventListener('click', closeViewer);
+viewerDl.addEventListener('click', () => downloadIndex(currentIndex));
+viewerFull.addEventListener('click', () => {
+  if (!isValidIndex(currentIndex) || isFullRes) return;
+  isFullRes = true; updateViewerButtons(currentIndex);
+  startDecode(currentIndex, true);
+});
+viewerPrompt.addEventListener('click', () => {
+  if (!isValidIndex(currentIndex)) return;
+  const list = prompts[currentIndex];
+  if (!list) { loadAndShowPrompts(currentIndex, true); return; }
+  if (!list.length) return;
+  showPromptPanel(!showingPromptPanel);
+});
+viewerPrev.addEventListener('click', prevInView);
+viewerNext.addEventListener('click', nextInView);
+viewerFav.addEventListener('click', toggleFavForCurrent);
+viewerCopy.addEventListener('click', async () => {
+  if (!isValidIndex(currentIndex)) return;
+  const p = files[currentIndex].path;
+  const orig = viewerCopy.textContent;
+  try { await navigator.clipboard.writeText(p); }
+  catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = p; ta.style.position = 'fixed'; ta.style.top = '-1000px';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    ta.remove();
+  }
+  viewerCopy.textContent = "Copied";
+  setTimeout(() => { viewerCopy.textContent = orig; }, 900);
+});
+
+pClose.addEventListener('click', () => showPromptPanel(false));
+pPrev.addEventListener('click', () => {
+  const list = prompts[currentIndex] || [];
+  if (list.length <= 1) return;
+  currentPromptIdx = (currentPromptIdx - 1 + list.length) % list.length;
+  renderPromptPanel(currentIndex);
+});
+pNext.addEventListener('click', () => {
+  const list = prompts[currentIndex] || [];
+  if (list.length <= 1) return;
+  currentPromptIdx = (currentPromptIdx + 1) % list.length;
+  renderPromptPanel(currentIndex);
+});
+pCopy.addEventListener('click', async () => {
+  const list = prompts[currentIndex] || [];
+  const text = list[currentPromptIdx] || "";
+  if (!text) return;
+  try { await navigator.clipboard.writeText(text); }
+  catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.top = '-1000px';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    ta.remove();
+  }
+  const old = pCopy.textContent;
+  pCopy.textContent = "Copied";
+  setTimeout(() => { pCopy.textContent = old; }, 900);
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === '?') {
+    if (!e.ctrlKey && !e.metaKey) {
+      shortcutsEl.style.display = shortcutsEl.style.display === 'block' ? 'none' : 'block';
+    }
+    return;
+  }
+  if (!viewer.classList.contains('open')) return;
+  if (e.key === 'Escape') {
+    if (shortcutsEl.style.display === 'block') { shortcutsEl.style.display = 'none'; return; }
+    if (showingPromptPanel) { showPromptPanel(false); return; }
+    closeViewer(); return;
+  }
+  if (e.key === 'p' || e.key === 'P') { viewerPrompt.click(); return; }
+  if (e.key === 'f' || e.key === 'F') { toggleFavForCurrent(); return; }
+  if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) { viewerCopy.click(); return; }
+  if (e.key === 'ArrowLeft') {
+    if (showingPromptPanel) { pPrev.click(); e.preventDefault(); return; }
+    prevInView(); e.preventDefault(); return;
+  }
+  if (e.key === 'ArrowRight') {
+    if (showingPromptPanel) { pNext.click(); e.preventDefault(); return; }
+    nextInView(); e.preventDefault(); return;
+  }
+});
+helpBtn.addEventListener('click', () => {
+  shortcutsEl.style.display = shortcutsEl.style.display === 'block' ? 'none' : 'block';
+});
+
+// =====================================================================
+// Grid interactions
+// =====================================================================
+grid.addEventListener('click', (ev) => {
+  const dlBtn = ev.target.closest('.dl');
+  if (dlBtn) {
+    const tile = dlBtn.closest('.tile');
+    if (!tile) return;
+    ev.preventDefault(); ev.stopPropagation();
+    const i = Number(tile.dataset.index);
+    downloadIndex(i);
+    return;
+  }
+  const star = ev.target.closest('.star');
+  if (star) {
+    const tile = star.closest('.tile');
+    if (!tile) return;
+    ev.preventDefault(); ev.stopPropagation();
+    const i = Number(tile.dataset.index);
+    if (!isValidIndex(i)) return;
+    const p = files[i].path;
+    if (favorites.has(p)) favorites.delete(p); else favorites.add(p);
+    saveFavoritesFor(rootKey, favorites);
+    renderVisible();
+    return;
+  }
+  const tile = ev.target.closest('.tile');
+  if (!tile) return;
+  const i = Number(tile.dataset.index);
+  if (!isValidIndex(i)) return;
+  if (multiselect) {
+    ev.preventDefault(); ev.stopPropagation();
+    toggleSelectionIndex(i);
+    return;
+  }
+  const selBox = ev.target.closest('.sel');
+  if (selBox) { ev.stopPropagation(); return; }
+  const k = view.indexOf(i);
+  openViewer(i, k >= 0 ? k : 0);
+});
+grid.addEventListener('change', (ev) => {
+  const selBox = ev.target.closest('.sel');
+  if (!selBox) return;
+  const i = Number(selBox.dataset.index);
+  if (!isValidIndex(i)) { selBox.checked = false; return; }
+  if (selBox.checked) selected.add(i); else selected.delete(i);
+  updateSelectionUI();
+  renderVisible();
+});
+
+// =====================================================================
+// Filter bar wiring
+// =====================================================================
+sortBySel.value = filterState.sortBy;
+sortDirBtn.textContent = filterState.sortDir === 'asc' ? "↑" : "↓";
+fnQuery.value = filterState.query;
+oriSel.value = filterState.orientation;
+kwQuery.value = filterState.keyword;
+favOnlyBtn.classList.toggle('on', filterState.favoritesOnly);
+
+sortBySel.addEventListener('change', async () => {
+  filterState.sortBy = sortBySel.value;
+  if (filterState.sortBy === 'random') filterState.randomSeed = (Math.random() * 0xFFFFFFFF) >>> 0;
+  saveFilterState();
+  await ensureSortDataFor(filterState.sortBy);
+  applyFilters();
+});
+sortDirBtn.addEventListener('click', () => {
+  filterState.sortDir = filterState.sortDir === 'asc' ? 'desc' : 'asc';
+  sortDirBtn.textContent = filterState.sortDir === 'asc' ? "↑" : "↓";
+  saveFilterState(); applyFilters();
+});
+let fnT = 0;
+fnQuery.addEventListener('input', () => {
+  clearTimeout(fnT);
+  fnT = setTimeout(() => {
+    filterState.query = fnQuery.value; saveFilterState(); applyFilters();
+  }, 150);
+});
+oriSel.addEventListener('change', () => {
+  filterState.orientation = oriSel.value;
+  saveFilterState(); applyFilters();
+});
+let kwT = 0;
+kwQuery.addEventListener('input', () => {
+  clearTimeout(kwT);
+  kwT = setTimeout(() => {
+    filterState.keyword = kwQuery.value; saveFilterState(); applyFilters();
+  }, 200);
+});
+favOnlyBtn.addEventListener('click', () => {
+  filterState.favoritesOnly = !filterState.favoritesOnly;
+  favOnlyBtn.classList.toggle('on', filterState.favoritesOnly);
+  saveFilterState(); applyFilters();
+});
+resetFiltersBtn.addEventListener('click', () => {
+  filterState.query = ""; fnQuery.value = "";
+  filterState.keyword = ""; kwQuery.value = "";
+  filterState.orientation = "all"; oriSel.value = "all";
+  filterState.formats = null; refreshFormatChips();
+  filterState.colors.clear(); renderColorStrip();
+  filterState.favoritesOnly = false; favOnlyBtn.classList.remove('on');
+  saveFilterState(); applyFilters();
+});
+
+function refreshFormatChips() {
+  while (fmtWrapEl.firstChild) fmtWrapEl.removeChild(fmtWrapEl.firstChild);
+  const exts = Array.from(new Set(files.map(f => f.ext))).sort();
+  for (const ext of exts) {
+    const label = document.createElement('label');
+    label.className = 'fmtChip';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    const active = !filterState.formats || filterState.formats.has(ext);
+    cb.checked = active;
+    if (!active) label.classList.add('off');
+    cb.addEventListener('change', () => {
+      if (!filterState.formats) filterState.formats = new Set(exts);
+      if (cb.checked) filterState.formats.add(ext);
+      else filterState.formats.delete(ext);
+      if (filterState.formats.size === exts.length) filterState.formats = null;
+      label.classList.toggle('off', !cb.checked);
+      saveFilterState(); applyFilters();
+    });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(ext));
+    fmtWrapEl.appendChild(label);
+  }
+}
+function renderColorStrip() {
+  while (colorStripEl.firstChild) colorStripEl.removeChild(colorStripEl.firstChild);
+  for (const b of COLOR_BUCKETS) {
+    const btn = document.createElement('button');
+    btn.className = 'colorSwatch';
+    btn.style.background = b.swatch;
+    btn.title = b.label;
+    if (filterState.colors.has(b.key)) btn.classList.add('on');
+    btn.addEventListener('click', () => {
+      if (filterState.colors.has(b.key)) filterState.colors.delete(b.key);
+      else filterState.colors.add(b.key);
+      btn.classList.toggle('on');
+      saveFilterState(); applyFilters();
+    });
+    colorStripEl.appendChild(btn);
+  }
+}
+renderColorStrip();
+
+// =====================================================================
+// Cols slider + multi-select + prefetch
+// =====================================================================
+colSlider.value = String(desiredCols);
+colVal.textContent = String(desiredCols);
+colSlider.addEventListener('input', () => {
+  desiredCols = Math.max(1, Math.min(8, Number(colSlider.value) || 4));
+  colVal.textContent = String(desiredCols);
+  localStorage.setItem('fast_gallery_cols', String(desiredCols));
+  rebuildLayout(true);
+});
+
+function flipMs() { setMultiselect(!multiselect); }
+msSwitch.addEventListener('click', flipMs);
+msSwitch.addEventListener('keydown', e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flipMs(); } });
+
+function updatePrefetchUI() {
+  pfSwitch.classList.toggle('on', prefetchActive);
+  pfSwitch.setAttribute('aria-checked', prefetchActive ? "true" : "false");
+  if (!prefetchActive || !files.length) { pfProg.style.display = "none"; return; }
+  pfProg.style.display = "block";
+  pfProg.textContent = `${prefetchDone} / ${files.length}`;
+}
+async function startPrefetchPrompts() {
+  if (prefetchAbort) prefetchAbort.aborted = true;
+  const token = { aborted:false };
+  prefetchAbort = token;
+  prefetchDone = 0;
+  updatePrefetchUI();
+  const CONC = 6;
+  let idx = 0;
+  const total = files.length;
+  const workers = new Array(Math.min(CONC, total)).fill(0).map(async () => {
+    while (idx < total) {
+      const cur = idx++;
+      if (token.aborted) return;
+      if (!prompts[cur]) { try { await ensurePrompts(cur); } catch (_) {} }
+      prefetchDone++;
+      if ((prefetchDone & 15) === 0 || prefetchDone === total) updatePrefetchUI();
+    }
+  });
+  await Promise.all(workers);
+  if (!token.aborted) { updatePrefetchUI(); renderVisible(); }
+}
+function flipPf() {
+  prefetchActive = !prefetchActive;
+  updatePrefetchUI();
+  if (prefetchActive && files.length) startPrefetchPrompts();
+  else if (prefetchAbort) { prefetchAbort.aborted = true; prefetchAbort = null; }
+}
+pfSwitch.addEventListener('click', flipPf);
+pfSwitch.addEventListener('keydown', e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flipPf(); } });
+
+// =====================================================================
+// ZIP
+// =====================================================================
+const crcTable = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = crcTable[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function dosDateTime(d) {
+  const year = Math.max(1980, d.getFullYear());
+  const time = (d.getHours()<<11) | (d.getMinutes()<<5) | Math.floor(d.getSeconds()/2);
+  const date = ((year - 1980)<<9) | ((d.getMonth()+1)<<5) | d.getDate();
+  return { time, date };
+}
+function u16(v){ const a=new Uint8Array(2); new DataView(a.buffer).setUint16(0,v,true); return a; }
+function u32(v){ const a=new Uint8Array(4); new DataView(a.buffer).setUint32(0,v,true); return a; }
+
+async function buildZip(indices) {
+  indices = (indices || []).filter(isValidIndex).sort((a,b) => a-b);
+  if (!indices.length) throw new Error("No valid files selected");
+  const MAX = 512 * 1024 * 1024;
+  let total = 0;
+  for (const i of indices) { const f = await getFileForEntry(files[i]); total += f.size; }
+  if (total > MAX) throw new Error(`Selection too large (${Math.round(total/1024/1024)} MB).`);
+  const enc = new TextEncoder();
+  const { time, date } = dosDateTime(new Date());
+  const localParts = [], centralParts = [];
+  let offset = 0;
+  for (const i of indices) {
+    const f = await getFileForEntry(files[i]);
+    const name = dlNameForIndex(i);
+    const nameBytes = enc.encode(name);
+    const ab = await f.arrayBuffer();
+    const data = new Uint8Array(ab);
+    const crc = crc32(data);
+    const size = data.byteLength;
+    const local = [u32(0x04034b50),u16(20),u16(0),u16(0),u16(time),u16(date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),nameBytes];
+    const localLen = local.reduce((s,p) => s + p.length, 0);
+    localParts.push(...local, data);
+    const central = [u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(time),u16(date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),nameBytes];
+    centralParts.push(...central);
+    offset += localLen + data.length;
+  }
+  const centralStart = offset;
+  const centralSize = centralParts.reduce((s,p) => s + p.length, 0);
+  const eocd = [u32(0x06054b50),u16(0),u16(0),u16(indices.length),u16(indices.length),u32(centralSize),u32(centralStart),u16(0)];
+  return new Blob([...localParts, ...centralParts, ...eocd], { type:"application/zip" });
+}
+dlAllBtn.addEventListener('click', async () => {
+  const indices = Array.from(selected).sort((a,b) => a-b);
+  if (!indices.length) return;
+  dlAllBtn.disabled = true;
+  const old = dlAllBtn.textContent;
+  dlAllBtn.textContent = "Zipping...";
+  try {
+    const zipBlob = await buildZip(indices);
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = "selected_images.zip";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 12000);
+  } catch (err) { alert(err?.message || "Failed to build ZIP"); }
+  finally { dlAllBtn.disabled = false; dlAllBtn.textContent = old; }
+});
+
+// =====================================================================
+// Load pipeline
+// =====================================================================
+async function resetAndLoadFiles(entries, key) {
+  if (prefetchAbort) { prefetchAbort.aborted = true; prefetchAbort = null; }
+  files = entries;
+  dims = new Array(files.length);
+  dimsP = new Array(files.length);
+  prompts = new Array(files.length);
+  promptsP = new Array(files.length);
+  colors = new Array(files.length);
+  selected.clear();
+  rootKey = key || "";
+  favorites = await loadFavoritesFor(rootKey);
+
+  empty.style.display = files.length ? "none" : "block";
+  countEl.textContent = `${files.length} image${files.length === 1 ? "" : "s"}`;
+
+  refreshFormatChips();
+  updateSelectionUI();
+  updatePrefetchUI();
+
+  await ensureFirstDims(400);
+
+  applyFilters();
+
+  if (prefetchActive && files.length) startPrefetchPrompts();
+}
+
+async function ensureFirstDims(n) {
+  const upto = Math.min(n, files.length);
+  const idxs = [];
+  for (let i = 0; i < upto; i++) idxs.push(i);
+  await mapLimit(idxs, 16, ensureDims);
+  ensureRestDimsInBackground(upto);
+}
+async function ensureRestDimsInBackground(startFrom) {
+  const idxs = [];
+  for (let i = startFrom; i < files.length; i++) idxs.push(i);
+  if (!idxs.length) return;
+  mapLimit(idxs, 8, async (i) => {
+    await ensureDims(i);
+    if ((i & 63) === 0) onScrollOrResize();
+  }).then(() => { applyFilters(); });
+}
+
+async function loadViaFSA(dirHandle) {
+  const collected = [];
+  await walkDirectoryFSA(dirHandle, (batch) => {
+    for (const e of batch) collected.push(e);
+    if (collected.length && collected.length - files.length > 200) {}
+  });
+  collected.sort((a,b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
+  await resetAndLoadFiles(collected, "fsa:" + (dirHandle.name || "root"));
+}
+
+async function loadViaWebkitDirectory(fileList) {
+  const list = Array.from(fileList || []).filter(f => isImage(f.name));
+  list.sort((a,b) => {
+    const pa = (a.webkitRelativePath || a.name).toLowerCase();
+    const pb = (b.webkitRelativePath || b.name).toLowerCase();
+    return pa < pb ? -1 : pa > pb ? 1 : 0;
+  });
+  const entries = list.map(f => ({
+    name: f.name,
+    path: f.webkitRelativePath || f.name,
+    handle: null,
+    file: f,
+    ext: extOf(f.name).slice(1),
+    size: f.size,
+    lastModified: f.lastModified,
+  }));
+  const rootName = entries.length ? (entries[0].path.split("/")[0] || "") : "";
+  await resetAndLoadFiles(entries, "webkit:" + rootName);
+}
+
+async function pickFolder() {
+  if (hasFSA()) {
+    let handle;
+    try { handle = await window.showDirectoryPicker({ id:"fast-gallery", mode:"read" }); }
+    catch (_) { return; }
+    if (!handle) return;
+    reopenBanner.style.display = "none";
+    await idbPut(STORE_HANDLES, handle, HANDLE_KEY);
+    await loadViaFSA(handle);
+  } else {
+    dirInput.click();
+  }
+}
+pickBtn.addEventListener('click', pickFolder);
+dirInput.addEventListener('change', async () => {
+  reopenBanner.style.display = "none";
+  await loadViaWebkitDirectory(dirInput.files);
+});
+
+// Restore last folder banner
+(async () => {
+  if (!hasFSA()) return;
+  const rec = await restoreLastHandle();
+  if (!rec) return;
+  reopenBanner.style.display = "flex";
+  document.getElementById('reopenText').textContent =
+    `Reopen last folder: ${rec.handle.name}?`;
+  reopenYes.onclick = async () => {
+    let ok = rec.granted;
+    if (!ok) ok = await requestReadPermission(rec.handle);
+    if (!ok) { reopenBanner.style.display = "none"; return; }
+    reopenBanner.style.display = "none";
+    await loadViaFSA(rec.handle);
+  };
+  reopenNo.onclick = () => { reopenBanner.style.display = "none"; };
+})();
+
+// =====================================================================
+// Init
+// =====================================================================
+setMultiselect(false);
+updatePrefetchUI();
+requestAnimationFrame(() => { syncBarHeight(); drawViewer(); });
+
+window.addEventListener('beforeunload', () => {
+  if (decodeWorker && decodeWorker._url) {
+    try { decodeWorker.terminate(); } catch (_) {}
+    try { URL.revokeObjectURL(decodeWorker._url); } catch (_) {}
+  }
+});
+})();
+</script>
+
+</body>
+</html>
