@@ -7,57 +7,155 @@
 <style>
   :root{
     color-scheme: dark;
-    --bg:#000; --fg:#d8d8d8; --muted:#8a8a8a;
-    --tile:#0b0b0b; --stroke:#202020;
-    --ctrl-bg:#1a1a1a; --ctrl-bg-hover:#242424;
-    --ctrl-fg:#d8d8d8;
-    --gap:12px; --radius:12px; --barH:104px;
+    /* Ink & paper */
+    --bg:#0a0a0a;
+    --paper-2:#141414;
+    --paper-3:#1c1c1c;
+    --fg:#e6e2d8;
+    --fg-dim:#b8b3a7;
+    --muted:#7a756c;
+    --tile:#0e0e0e;
+    --rule:#242220;
+    --rule-strong:#3a3733;
+    --stroke:#242220;         /* legacy alias */
+    --ctrl-bg:#141414;        /* legacy alias */
+    --ctrl-bg-hover:#1c1c1c;  /* legacy alias */
+    --ctrl-fg:#e6e2d8;        /* legacy alias */
+    /* Accents — used sparingly */
+    --signal:#d97b2a;
+    --signal-fg:#f4b57a;
+    --signal-wash:rgba(217,123,42,.14);
+    --danger:#d84a3a;
+    --danger-fg:#f0a19a;
+    --danger-wash:rgba(216,74,58,.18);
+    --fav:#f2c14e;
+    /* Typography */
+    --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
+    /* Metrics */
+    --gap:12px; --barH:104px;
+    --tap:28px;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
   body{
     margin:0; background:var(--bg); color:var(--fg);
-    font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    font:13px/1.4 var(--font-ui);
     overflow-y:scroll; padding-top:var(--barH);
+    -webkit-font-smoothing:antialiased;
   }
   html.noscroll, body.noscroll { overflow:hidden; }
 
+  /* -------- Bar -------- */
   .bar{
     position:fixed; top:0; left:0; right:0; z-index:1000;
-    background:rgba(0,0,0,.82); backdrop-filter:blur(8px);
-    border-bottom:1px solid var(--stroke);
+    background:rgba(10,10,10,.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--rule);
   }
   .bar .row{
-    display:flex; gap:8px; align-items:center;
-    padding:8px 12px; flex-wrap:wrap;
+    display:flex; gap:6px; align-items:center;
+    padding:8px 14px; flex-wrap:wrap;
   }
-  .btn{
-    border:1px solid var(--stroke); background:rgba(255,255,255,.04);
-    color:var(--fg); padding:6px 10px; border-radius:8px;
-    cursor:pointer; user-select:none; font:inherit;
+  .bar .row + .row{border-top:1px solid var(--rule)}
+
+  /* -------- Button (single language) --------
+     Flat rectangle. 28px tap height. Uppercase 11px UI text.
+     Variants: default, primary (signal), danger, icon-only, ghost. */
+  .btn, #viewer button.vBtn, .folderMore, .crumb, .folderChip,
+  #confirmModal .actions .btn, #promptPanel .pnav button, #promptPanel .pact button,
+  #walkToast .btn, #quotaToast .btn{
+    height:var(--tap); min-height:var(--tap);
+    display:inline-flex; align-items:center; gap:6px;
+    padding:0 10px;
+    border:1px solid var(--rule);
+    background:var(--paper-2);
+    color:var(--fg);
+    border-radius:0;
+    cursor:pointer; user-select:none;
+    font:600 11px/1 var(--font-ui);
+    letter-spacing:.06em; text-transform:uppercase;
+    white-space:nowrap;
+    transition:border-color .1s ease, background .1s ease, color .1s ease;
   }
-  .btn:hover{background:rgba(255,255,255,.07)}
-  .btn.on{background:rgba(120,200,150,.16); border-color:rgba(140,220,170,.35)}
-  .btn[disabled]{opacity:.55; cursor:not-allowed}
-  .meta{color:var(--muted); white-space:nowrap; font-size:12px}
+  .btn:hover, #viewer button.vBtn:hover, .folderMore:hover,
+  #confirmModal .actions .btn:hover,
+  #promptPanel .pnav button:hover, #promptPanel .pact button:hover{
+    background:var(--paper-3); border-color:var(--rule-strong);
+  }
+  .btn:focus-visible, #viewer button.vBtn:focus-visible{
+    outline:none; border-color:var(--fg-dim);
+  }
+  .btn[disabled], #viewer button.vBtn[disabled],
+  #promptPanel .pnav button[disabled]{
+    opacity:.4; cursor:not-allowed;
+  }
+  .btn.on, #viewer button.vBtn.on{
+    background:var(--signal-wash); border-color:var(--signal);
+    color:var(--signal-fg);
+  }
+  .btn.danger, #viewer button.vBtn.danger{
+    color:var(--danger-fg); border-color:var(--rule-strong);
+  }
+  .btn.danger:hover, #viewer button.vBtn.danger:hover{
+    background:var(--danger-wash); border-color:var(--danger); color:#fff;
+  }
+
+  /* Primary = pickBtn only */
+  #pickBtn.btn{
+    color:#0a0a0a; background:var(--signal); border-color:var(--signal);
+  }
+  #pickBtn.btn:hover{ background:#e78a3c; border-color:#e78a3c; }
+
+  /* Meta text (counts, dims). Numbers in mono. */
+  .meta{
+    color:var(--muted); white-space:nowrap;
+    font:12px/1 var(--font-mono);
+    letter-spacing:.02em;
+  }
   .spacer{flex:1}
   .hint{color:var(--muted); font-size:12px}
 
+  /* Divider between grouped items */
+  .bar .row .divider{
+    width:1px; align-self:stretch; margin:2px 6px;
+    background:var(--rule);
+  }
+
+  /* Uppercase eyebrow labels for grouped controls */
+  .eyebrow{
+    color:var(--muted);
+    font:600 10px/1 var(--font-ui);
+    letter-spacing:.14em; text-transform:uppercase;
+    white-space:nowrap; user-select:none;
+  }
+
+  /* -------- Grouped control (label + input) -------- */
   .ctrl{
     display:flex; align-items:center; gap:8px;
-    padding:5px 8px; border:1px solid var(--stroke);
-    border-radius:8px; background:rgba(255,255,255,.03);
+    height:var(--tap);
+    padding:0 10px;
+    border:1px solid var(--rule);
+    background:var(--paper-2);
   }
-  .ctrl label{color:var(--muted); font-size:12px; user-select:none;}
-  .ctrl input[type="range"]{width:140px; accent-color:#fff;}
-  .ctrl .val{width:18px; text-align:right; color:var(--fg); font-size:12px;}
+  .ctrl label{color:var(--muted); font:600 10px/1 var(--font-ui); letter-spacing:.12em; text-transform:uppercase; user-select:none;}
+  .ctrl input[type="range"]{
+    width:120px; accent-color:var(--signal);
+    background:transparent;
+  }
+  .ctrl .val{
+    min-width:20px; text-align:right;
+    color:var(--fg); font:12px/1 var(--font-mono);
+  }
 
+  /* -------- Inputs / selects -------- */
   select, input[type="text"], input[type="search"]{
-    background:var(--ctrl-bg); color:var(--ctrl-fg);
-    border:1px solid var(--stroke); border-radius:8px;
-    padding:5px 8px; font:inherit; outline:none;
-    accent-color:#fff;
+    height:var(--tap);
+    background:var(--paper-2); color:var(--fg);
+    border:1px solid var(--rule); border-radius:0;
+    padding:0 10px; font:13px/1 var(--font-ui);
+    outline:none;
   }
+  input[type="search"]{width:180px}
   select{
     appearance:none;
     -webkit-appearance:none;
@@ -69,276 +167,463 @@
     background-size: 5px 5px, 5px 5px;
     background-repeat:no-repeat;
   }
-  select:hover{background-color:var(--ctrl-bg-hover)}
-  select:focus, input:focus{border-color:rgba(255,255,255,.30)}
-  select option{
-    background:#1a1a1a;
-    color:#d8d8d8;
-  }
-  select option:checked, select option:hover{
-    background:#2a2a2a;
-    color:#ffffff;
-  }
-  input[type="search"]{width:180px}
-  input::placeholder{color:var(--muted); opacity:.85}
+  select:hover{background-color:var(--paper-3)}
+  select:focus, input:focus{border-color:var(--fg-dim)}
+  select option{background:var(--paper-2); color:var(--fg);}
+  input::placeholder{color:var(--muted)}
 
+  /* -------- Toggle (flat, no pill) -------- */
   .toggle{
     display:flex; align-items:center; gap:8px;
-    padding:5px 8px; border:1px solid var(--stroke);
-    border-radius:8px; background:rgba(255,255,255,.03);
+    height:var(--tap); padding:0 10px;
+    border:1px solid var(--rule);
+    background:var(--paper-2);
+    cursor:pointer;
   }
-  .toggle .tlabel{color:var(--muted); font-size:12px; user-select:none; white-space:nowrap;}
+  .toggle:hover{background:var(--paper-3)}
+  .toggle .tlabel{
+    color:var(--muted); font:600 10px/1 var(--font-ui);
+    letter-spacing:.12em; text-transform:uppercase;
+    user-select:none; white-space:nowrap;
+  }
   .switch{
-    width:34px; height:20px; border-radius:999px;
-    border:1px solid var(--stroke); background:rgba(255,255,255,.06);
+    width:26px; height:14px;
+    border:1px solid var(--rule-strong); background:transparent;
     position:relative; cursor:pointer;
+    border-radius:0;
   }
   .switch .knob{
-    position:absolute; top:2px; left:2px;
-    width:14px; height:14px; border-radius:50%;
-    background:rgba(255,255,255,.85);
-    transition:transform .16s ease;
+    position:absolute; top:1px; left:1px;
+    width:10px; height:10px;
+    background:var(--muted);
+    border-radius:0;
+    transition:transform .12s ease, background .12s ease;
   }
-  .switch.on{background:rgba(120,200,150,.22); border-color:rgba(140,220,170,.35)}
-  .switch.on .knob{transform:translateX(14px)}
+  .toggle.on .switch{background:var(--signal-wash); border-color:var(--signal)}
+  .toggle.on .switch .knob{transform:translateX(12px); background:var(--signal)}
+  .toggle.on .tlabel{color:var(--signal-fg)}
+  .toggle[aria-checked="true"] .switch{background:var(--signal-wash); border-color:var(--signal)}
+  .toggle[aria-checked="true"] .switch .knob{transform:translateX(12px); background:var(--signal)}
+  .toggle[aria-checked="true"] .tlabel{color:var(--signal-fg)}
 
+  /* -------- Format chips -------- */
   .fmtWrap{display:inline-flex; gap:4px; flex-wrap:wrap;}
   .fmtChip{
-    display:inline-flex; align-items:center; gap:4px;
-    padding:2px 6px; background:rgba(255,255,255,.04);
-    border:1px solid var(--stroke); border-radius:6px;
-    font-size:11px; color:var(--fg); cursor:pointer;
-    text-transform:uppercase; letter-spacing:.3px;
+    display:inline-flex; align-items:center; gap:6px;
+    height:var(--tap); padding:0 8px;
+    background:var(--paper-2);
+    border:1px solid var(--rule);
+    font:600 10px/1 var(--font-mono);
+    color:var(--fg); cursor:pointer;
+    text-transform:uppercase; letter-spacing:.08em;
   }
-  .fmtChip.off{opacity:.4}
-  .fmtChip input{margin:0; accent-color:#fff}
+  .fmtChip:hover{background:var(--paper-3)}
+  .fmtChip.off{opacity:.32}
+  .fmtChip input{margin:0; accent-color:var(--signal); width:12px; height:12px}
 
-  .colorStrip{display:inline-flex; gap:3px}
+  /* -------- Color swatches (still round — data affordance) -------- */
+  .colorStrip{display:inline-flex; gap:3px; align-items:center}
   .colorSwatch{
-    width:20px; height:20px; border-radius:50%;
-    border:2px solid transparent; cursor:pointer; padding:0;
+    width:18px; height:18px; border-radius:50%;
+    border:1px solid var(--rule);
+    cursor:pointer; padding:0;
   }
-  .colorSwatch.on{border-color:#fff; box-shadow:0 0 0 1px #000 inset}
+  .colorSwatch:hover{border-color:var(--fg-dim)}
+  .colorSwatch.on{
+    border-color:var(--signal);
+    box-shadow:0 0 0 2px var(--bg) inset;
+  }
 
-  .folderStrip{
-    display:inline-flex; gap:4px; flex-wrap:nowrap;
-    max-width:38vw; overflow-x:auto;
+  /* -------- Folder row -------- */
+  .folderRow{
+    display:flex; align-items:center; gap:8px;
+    padding:8px 14px 10px;
+    border-top:1px solid var(--rule);
+  }
+  .folderRow.hidden{display:none}
+  .folderCrumbs{
+    display:flex; align-items:center; gap:0;
+    flex:0 0 auto; max-width:44vw;
+    overflow-x:auto; white-space:nowrap;
     padding:2px 0;
   }
-  .folderChip{
-    display:inline-flex; align-items:center; gap:4px;
-    padding:3px 8px; background:var(--ctrl-bg);
-    border:1px solid var(--stroke); border-radius:6px;
-    font-size:11px; color:var(--fg); cursor:pointer;
+  .folderCrumbs::-webkit-scrollbar{height:6px}
+  .folderCrumbs::-webkit-scrollbar-thumb{background:var(--rule-strong)}
+  .crumb{
+    height:24px; min-height:24px;
+    padding:0 6px; background:transparent;
+    border:1px solid transparent; border-radius:0;
+    font:600 11px/1 var(--font-ui); letter-spacing:.04em;
+    color:var(--muted); cursor:pointer;
+    text-transform:none;
     white-space:nowrap; max-width:180px;
     overflow:hidden; text-overflow:ellipsis;
     user-select:none;
   }
-  .folderChip:hover{background:var(--ctrl-bg-hover)}
-  .folderChip.on{
-    background:rgba(120,200,150,.16);
-    border-color:rgba(140,220,170,.35);
-    color:#fff;
+  .crumb:hover{background:var(--paper-2); color:var(--fg)}
+  .crumb.current{color:var(--fg); background:var(--paper-2); border-color:var(--rule)}
+  .crumbSep{color:var(--muted); font-size:11px; padding:0 4px; user-select:none}
+  .folderStrip{
+    display:flex; gap:4px; flex-wrap:wrap;
+    flex:1 1 auto; min-width:0;
+    padding:2px 0;
+    max-height:30px; overflow:hidden;
+    align-content:flex-start;
   }
-  .folderChip.root{font-style:italic; opacity:.85}
+  .folderStrip.expanded{ max-height:none; overflow:visible; }
+  .folderStrip.scroll{
+    flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden;
+    max-height:none;
+  }
+  .folderStrip.scroll::-webkit-scrollbar{height:8px}
+  .folderStrip.scroll::-webkit-scrollbar-thumb{background:var(--rule-strong)}
+  .folderChip{
+    height:24px; min-height:24px;
+    padding:0 10px; background:var(--paper-2);
+    border:1px solid var(--rule);
+    font:600 11px/1 var(--font-ui); letter-spacing:.04em;
+    color:var(--fg); cursor:pointer; text-transform:none;
+    white-space:nowrap; max-width:200px;
+    overflow:hidden; text-overflow:ellipsis;
+    user-select:none; flex:0 0 auto;
+  }
+  .folderChip:hover{background:var(--paper-3); border-color:var(--rule-strong)}
+  .folderChip.root{opacity:.85}
+  .folderMore{
+    height:24px; min-height:24px;
+    padding:0 10px;
+    font:600 10px/1 var(--font-ui); letter-spacing:.10em; text-transform:uppercase;
+    color:var(--muted);
+    background:transparent; border-color:var(--rule);
+  }
+  .folderMore:hover{background:var(--paper-2); color:var(--fg)}
+  .folderRowActions{display:flex; gap:6px; flex:0 0 auto}
 
+  /* -------- Grid -------- */
   #grid{
     position:relative;
     padding:14px 12px 40px;
     width:100%; min-height:1px;
     contain:layout paint;
   }
+  /* Signature: contact-sheet plate. Zero radius. Depth as top hairline. */
   .tile{
     position:absolute; margin:0;
-    background:var(--tile); border:1px solid var(--stroke);
-    border-radius:var(--radius); overflow:hidden;
+    background:var(--tile); border:1px solid var(--rule);
+    border-radius:0; overflow:hidden;
     will-change:top,left; contain:layout paint;
     content-visibility:auto; contain-intrinsic-size:320px 240px;
-    border-left-width:3px;
-    border-left-color:var(--stroke);
+    border-top-width:2px; border-top-color:var(--rule);
+    border-left-width:1px; border-left-color:var(--rule);
+    transition:border-color .08s ease;
   }
-  .tile[data-depth="1"]{border-left-color:hsl(  47, 45%, 28%)}
-  .tile[data-depth="2"]{border-left-color:hsl(  94, 45%, 28%)}
-  .tile[data-depth="3"]{border-left-color:hsl( 141, 45%, 28%)}
-  .tile[data-depth="4"]{border-left-color:hsl( 188, 45%, 28%)}
-  .tile[data-depth="5"]{border-left-color:hsl( 235, 45%, 32%)}
-  .tile[data-depth="6"]{border-left-color:hsl( 282, 45%, 30%)}
-  .tile[data-depth="7"]{border-left-color:hsl( 329, 45%, 30%)}
-  .tile[data-depth="8"]{border-left-color:hsl(  16, 45%, 30%)}
+  .tile:hover{border-color:var(--rule-strong)}
+  .tile[data-depth="1"]{border-top-color:hsl(  38, 40%, 40%)}
+  .tile[data-depth="2"]{border-top-color:hsl(  88, 35%, 38%)}
+  .tile[data-depth="3"]{border-top-color:hsl( 168, 35%, 38%)}
+  .tile[data-depth="4"]{border-top-color:hsl( 208, 45%, 42%)}
+  .tile[data-depth="5"]{border-top-color:hsl( 258, 35%, 45%)}
+  .tile[data-depth="6"]{border-top-color:hsl( 308, 40%, 42%)}
+  .tile[data-depth="7"]{border-top-color:hsl( 348, 45%, 42%)}
+  .tile[data-depth="8"]{border-top-color:hsl(  18, 55%, 42%)}
   .thumb{
     width:100%; height:100%; display:block;
     object-fit:cover; background:#050505;
   }
+
+  /* Index stamp — top-left, mono, no chip */
   .num{
-    position:absolute; top:8px; left:8px;
-    padding:3px 7px; border-radius:999px;
-    font-size:12px; color:rgba(255,255,255,.92);
-    background:rgba(0,0,0,.55);
-    border:1px solid rgba(255,255,255,.10);
-    letter-spacing:.2px; user-select:none; pointer-events:none;
+    position:absolute; top:6px; left:8px;
+    padding:0;
+    font:600 11px/1 var(--font-mono);
+    color:rgba(255,255,255,.72);
+    letter-spacing:.02em; user-select:none; pointer-events:none;
+    text-shadow:0 1px 2px rgba(0,0,0,.9);
   }
+  /* Dims — bottom-left, mono, no chip */
   .dim{
-    position:absolute; left:8px; bottom:8px;
-    padding:3px 7px; border-radius:999px;
-    font-size:12px; color:rgba(255,255,255,.88);
-    background:rgba(0,0,0,.45);
-    border:1px solid rgba(255,255,255,.10);
+    position:absolute; left:8px; bottom:6px;
+    padding:0;
+    font:11px/1 var(--font-mono);
+    color:rgba(255,255,255,.72);
     user-select:none; pointer-events:none;
+    text-shadow:0 1px 2px rgba(0,0,0,.9);
   }
+  /* Prompt marker — small hairline square, top-left below index */
   .pchip{
-    position:absolute; left:8px; top:36px;
-    padding:2px 6px; border-radius:999px;
-    font-size:11px; color:rgba(255,255,255,.92);
-    background:rgba(50,140,80,.55);
-    border:1px solid rgba(120,220,150,.35);
+    position:absolute; left:8px; top:24px;
+    padding:1px 5px;
+    font:600 9px/1 var(--font-mono); letter-spacing:.10em;
+    color:var(--signal-fg);
+    background:rgba(10,10,10,.75);
+    border:1px solid var(--signal);
     user-select:none; pointer-events:none; display:none;
   }
   .tile[data-hasprompt="1"] .pchip{display:block}
-
+  /* Folder chip on tile — bottom-left, above dim, muted */
   .fchip{
-    position:absolute; left:8px; bottom:36px;
-    padding:2px 7px; border-radius:999px;
-    font-size:10.5px; color:rgba(255,255,255,.78);
-    background:rgba(0,0,0,.55);
-    border:1px solid rgba(255,255,255,.08);
+    position:absolute; left:8px; bottom:22px;
+    padding:0;
+    font:10px/1 var(--font-mono);
+    color:rgba(255,255,255,.52);
     max-width:calc(100% - 60px);
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     user-select:none; pointer-events:none;
-    display:none;
-    letter-spacing:.2px;
+    display:none; letter-spacing:.02em;
+    text-shadow:0 1px 2px rgba(0,0,0,.9);
   }
   .tile[data-folder]:not([data-folder=""]) .fchip{ display:block; }
+
+  /* Star (favorites) — square, mono, unified with tile actions */
   .star{
-    position:absolute; right:8px; top:8px;
-    width:26px; height:26px; border-radius:50%;
-    background:rgba(0,0,0,.55);
-    border:1px solid rgba(255,255,255,.14);
+    position:absolute; right:6px; top:6px;
+    width:26px; height:26px;
+    background:rgba(10,10,10,.72);
+    border:1px solid var(--rule);
     color:rgba(255,255,255,.55);
     display:grid; place-items:center;
-    cursor:pointer; font-size:14px;
+    cursor:pointer; font-size:14px; line-height:1;
     user-select:none;
+    opacity:0; transition:opacity .1s ease, color .1s ease;
   }
-  .star:hover{color:rgba(255,255,255,.95)}
-  .tile[data-fav="1"] .star{color:#f6c445; border-color:rgba(246,196,69,.35)}
-  .dl{
-    position:absolute; right:8px; bottom:8px;
-    width:32px; height:32px; border-radius:10px;
-    border:1px solid rgba(255,255,255,.12);
-    background:rgba(0,0,0,.55); color:rgba(255,255,255,.92);
-    display:grid; place-items:center; cursor:pointer;
-  }
-  .dl:hover{background:rgba(255,255,255,.08)}
-  .dl svg{width:16px; height:16px}
+  .tile:hover .star, .tile[data-fav="1"] .star{opacity:1}
+  .star:hover{color:#fff; border-color:var(--rule-strong)}
+  .tile[data-fav="1"] .star{color:var(--fav); border-color:var(--fav); opacity:1}
 
+  /* Tile action buttons (download / delete) — bottom-right, square */
+  .dl, .del{
+    position:absolute; bottom:6px;
+    width:28px; height:28px;
+    border:1px solid var(--rule);
+    background:rgba(10,10,10,.72);
+    color:rgba(255,255,255,.85);
+    display:grid; place-items:center; cursor:pointer;
+    opacity:0; transition:opacity .1s ease;
+  }
+  .tile:hover .dl, .tile:hover .del{opacity:1}
+  .dl{right:6px}
+  .del{right:40px; color:var(--danger-fg); border-color:var(--rule);}
+  .dl:hover{background:var(--paper-3); border-color:var(--rule-strong)}
+  .del:hover{background:var(--danger-wash); border-color:var(--danger); color:#fff}
+  .dl svg, .del svg{width:14px; height:14px}
+
+  /* Selection state — top bar in signal, not a shadow */
   .selWrap{
-    position:absolute; top:40px; right:8px;
+    position:absolute; top:6px; right:40px;
     width:22px; height:22px; display:none;
     align-items:center; justify-content:center;
-    border-radius:8px; background:rgba(0,0,0,.55);
-    border:1px solid rgba(255,255,255,.12);
+    background:rgba(10,10,10,.72);
+    border:1px solid var(--rule);
   }
   body.ms .selWrap{display:flex}
-  .selWrap input{width:16px; height:16px; accent-color:#fff; cursor:pointer}
+  .selWrap input{width:14px; height:14px; accent-color:var(--signal); cursor:pointer}
   body.ms .tile[data-selected="1"]{
-    border-color:rgba(255,255,255,.28);
-    box-shadow:0 0 0 1px rgba(255,255,255,.18) inset;
+    border-color:var(--signal);
+  }
+  body.ms .tile[data-selected="1"]::before{
+    content:""; position:absolute; inset:0;
+    box-shadow:inset 0 0 0 2px var(--signal);
+    pointer-events:none; z-index:1;
   }
 
+  /* -------- Loader overlay -------- */
+  #loader{
+    position:fixed; left:14px; bottom:14px;
+    z-index:4000;
+    display:none;
+    min-width:280px; max-width:min(420px, 90vw);
+    background:var(--paper-2);
+    border:1px solid var(--rule);
+    border-left:2px solid var(--signal);
+    padding:12px 14px;
+    font:12px/1.4 var(--font-ui);
+    color:var(--fg);
+  }
+  #loader.open{display:block}
+  #loader .row1{
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:8px;
+  }
+  #loader .lbl{
+    font:600 10px/1 var(--font-ui);
+    letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); flex:1 1 auto;
+  }
+  #loader .num{
+    position:static;
+    font:600 12px/1 var(--font-mono);
+    color:var(--fg-dim); letter-spacing:.02em;
+    text-shadow:none;
+  }
+  #loader .bar{
+    position:relative;
+    height:2px; background:var(--rule);
+    overflow:hidden;
+  }
+  #loader .bar .fill{
+    position:absolute; left:0; top:0; bottom:0;
+    background:var(--signal);
+    width:0%;
+    transition:width .12s linear;
+  }
+  #loader.indet .bar .fill{
+    width:32%;
+    animation:loaderSweep 1.2s ease-in-out infinite;
+  }
+  @keyframes loaderSweep{
+    0%   { transform:translateX(-100%); }
+    100% { transform:translateX(320%);  }
+  }
+  @media (prefers-reduced-motion: reduce){
+    #loader.indet .bar .fill{ animation:none; width:100%; opacity:.35; }
+  }
+
+  /* -------- Confirm modal -------- */
+  #confirmModal{
+    position:fixed; inset:0; z-index:5000;
+    background:rgba(0,0,0,.78); backdrop-filter:blur(6px);
+    display:none; align-items:center; justify-content:center;
+    padding:20px;
+  }
+  #confirmModal.open{display:flex}
+  #confirmModal .box{
+    background:var(--paper-2); border:1px solid var(--rule);
+    border-radius:0; padding:22px 24px; max-width:520px;
+    min-width:340px;
+  }
+  #confirmModal .eyebrow{margin-bottom:6px}
+  #confirmModal h3{
+    margin:0 0 10px;
+    font:500 18px/1.2 var(--font-ui); letter-spacing:-.005em;
+    color:var(--fg);
+  }
+  #confirmModal .msg{
+    color:var(--fg-dim); font:13px/1.55 var(--font-ui);
+    margin:0 0 14px;
+  }
+  #confirmModal .msg .warn{color:var(--danger-fg)}
+  #confirmModal .list{
+    max-height:180px; overflow:auto;
+    background:var(--bg); border:1px solid var(--rule);
+    border-radius:0; padding:10px 12px; margin:0 0 16px;
+    color:var(--fg-dim);
+    font:11px/1.55 var(--font-mono);
+    white-space:pre-wrap; word-break:break-all;
+  }
+  #confirmModal .list:empty{display:none}
+  #confirmModal .actions{display:flex; gap:8px; justify-content:flex-end}
+
+  /* -------- Empty state -------- */
   #empty{
-    display:flex; align-items:center; gap:14px;
-    padding:24px 20px; min-height:120px;
+    display:flex; align-items:flex-start; gap:24px;
+    padding:64px 40px 80px; min-height:calc(100vh - var(--barH));
+    color:var(--muted);
+    background:var(--bg);
+    margin:0;
+  }
+  #empty .emptyIndex{
+    font:600 12px/1 var(--font-mono);
+    color:var(--signal); letter-spacing:.14em;
+    padding:2px 0 0 4px;
+    border-left:2px solid var(--signal);
+    padding-left:12px;
+  }
+  #empty .emptyText{
+    display:flex; flex-direction:column; gap:14px;
+    max-width:560px;
+  }
+  #empty .emptyEyebrow{
+    font:600 11px/1 var(--font-ui);
+    letter-spacing:.18em; text-transform:uppercase;
     color:var(--muted);
   }
-  #empty .emptyArrow{
-    width:56px; height:56px; flex:0 0 auto;
-    color:rgba(255,255,255,.45);
+  #empty .emptyTitle{
+    font:400 32px/1.15 var(--font-ui); letter-spacing:-.01em;
+    color:var(--fg);
   }
-  #empty .emptyText{display:flex; flex-direction:column; gap:4px}
-  #empty .emptyTitle{font-size:15px; color:rgba(255,255,255,.82)}
-  #empty .emptySub{font-size:12px; color:var(--muted)}
+  #empty .emptySub{
+    font:14px/1.5 var(--font-ui); color:var(--muted);
+  }
   body.dropping{
-    outline:2px dashed rgba(120,180,255,.55);
-    outline-offset:-8px;
-    background:rgba(80,140,220,.06);
+    outline:2px solid var(--signal);
+    outline-offset:-2px;
   }
-  body.dropping #empty{
-    background:rgba(80,140,220,.08);
-    border-radius:10px;
-  }
+  body.dropping #empty{ background:var(--signal-wash); }
+
+  /* -------- Banners & toasts -------- */
   #reopenBanner, #permBanner{
-    padding:10px 12px; margin:8px 12px;
-    background:rgba(80,140,220,.10);
-    border:1px solid rgba(80,140,220,.30);
-    border-radius:8px; display:none; gap:10px; align-items:center;
+    padding:10px 14px; margin:0;
+    background:var(--paper-2);
+    border-top:1px solid var(--rule);
+    border-bottom:1px solid var(--rule);
+    border-left:2px solid var(--signal);
+    border-radius:0;
+    display:none; gap:12px; align-items:center;
+    font:12px/1 var(--font-ui);
   }
-  #permBanner{
-    background:rgba(220,140,80,.10);
-    border-color:rgba(220,140,80,.35);
+  #permBanner{ border-left-color:var(--danger); }
+  #walkToast, #quotaToast, #folderToast{
+    display:none; align-items:center; gap:12px;
+    padding:8px 14px; margin:0;
+    background:var(--paper-2);
+    border-top:1px solid var(--rule);
+    border-bottom:1px solid var(--rule);
+    border-left:2px solid var(--fav);
+    border-radius:0;
+    font:12px/1 var(--font-ui); color:var(--fg-dim);
   }
-  #walkToast, #quotaToast{
-    display:none; align-items:center; gap:8px;
-    padding:6px 10px; margin:6px 12px;
-    background:rgba(220,180,80,.10);
-    border:1px solid rgba(220,180,80,.35);
-    border-radius:8px; font-size:12px; color:rgba(255,255,255,.85);
+  #folderToast{ border-left-color:var(--signal); }
+  #folderToast .meta{
+    flex:1 1 auto; overflow:hidden; text-overflow:ellipsis;
+    font:12px/1 var(--font-mono); color:var(--fg);
   }
-  #walkToast .btn, #quotaToast .btn{ padding:2px 8px; font-size:12px; }
   #resetFilters.armed{
-    border-color:rgba(240,160,80,.55);
-    color:#f0a050;
+    border-color:var(--danger);
+    color:var(--danger-fg);
   }
+
+  /* -------- Depth legend -------- */
   .depthLegend{
-    display:flex; align-items:center; gap:3px;
-    padding:0 6px; min-height:14px;
+    display:flex; align-items:center; gap:2px;
+    padding:0 8px; min-height:14px;
   }
   .depthLegend:empty{display:none}
   .depthLegend .dband{
-    width:3px; height:14px; border-radius:2px;
-    background:var(--stroke);
+    width:6px; height:2px;
+    background:var(--rule-strong);
   }
 
+  /* -------- Viewer -------- */
   #viewer{
     position:fixed; inset:0;
-    background:rgba(0,0,0,.94);
+    background:#000;
     display:none; z-index:2500;
   }
   #viewer.open{display:block}
   #viewer .top{
     position:absolute; left:0; right:0; top:0;
-    display:flex; gap:8px; align-items:center;
-    padding:10px 12px;
-    background:rgba(0,0,0,.55);
-    border-bottom:1px solid rgba(255,255,255,.10);
-    backdrop-filter:blur(8px); z-index:2;
+    display:flex; gap:6px; align-items:center;
+    padding:10px 14px;
+    background:rgba(10,10,10,.88);
+    border-bottom:1px solid var(--rule);
+    backdrop-filter:blur(10px); z-index:2;
   }
   #viewer .title{
-    color:rgba(255,255,255,.92); font-size:13px;
+    color:var(--fg); font:13px/1 var(--font-mono);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     max-width:40vw;
   }
   #viewer .vdims{
-    padding:4px 8px; border-radius:999px;
-    font-size:12px; color:rgba(255,255,255,.84);
-    background:rgba(0,0,0,.35);
-    border:1px solid rgba(255,255,255,.10);
+    height:var(--tap); display:inline-flex; align-items:center;
+    padding:0 10px;
+    font:12px/1 var(--font-mono);
+    color:var(--fg-dim);
+    background:transparent;
+    border:1px solid var(--rule);
     white-space:nowrap; user-select:none;
   }
   #viewer .close{margin-left:auto}
-  #viewer button.vBtn{
-    border:1px solid rgba(255,255,255,.14);
-    background:rgba(255,255,255,.06);
-    color:rgba(255,255,255,.92);
-    border-radius:8px; padding:6px 10px;
-    cursor:pointer; font:inherit;
-    display:inline-flex; align-items:center; gap:6px;
-  }
-  #viewer button.vBtn:hover{background:rgba(255,255,255,.12)}
-  #viewer button.vBtn[disabled]{opacity:.5; cursor:not-allowed}
-  #viewer button.vBtn.on{
-    background:rgba(120,200,150,.20);
-    border-color:rgba(140,220,170,.40);
-  }
-  #viewer .navBtn{padding:6px 10px; font-size:16px}
+  #viewer .navBtn{padding:0 10px; font-size:14px}
   #viewer .stage{
     position:absolute; inset:52px 0 0;
     overflow:hidden; touch-action:none;
@@ -359,147 +644,159 @@
   #viewer #viewerFilmstrip{
     position:absolute; left:0; right:0; bottom:0;
     height:88px; display:none;
-    background:rgba(0,0,0,.68);
-    border-top:1px solid rgba(255,255,255,.10);
+    background:rgba(10,10,10,.85);
+    border-top:1px solid var(--rule);
     overflow-x:auto; overflow-y:hidden; white-space:nowrap;
     padding:4px 8px; z-index:3;
   }
   #viewer.showFilmstrip #viewerFilmstrip{ display:block; }
   #viewerFilmstrip .fcell{
     display:inline-block; width:64px; height:80px;
-    margin-right:6px; border-radius:6px; overflow:hidden;
-    border:1px solid rgba(255,255,255,.10);
+    margin-right:4px; border-radius:0; overflow:hidden;
+    border:1px solid var(--rule);
     background:#000; cursor:pointer; position:relative;
     vertical-align:top;
   }
-  #viewerFilmstrip .fcell.active{ border-color:rgba(255,255,255,.85); }
+  #viewerFilmstrip .fcell:hover{border-color:var(--rule-strong)}
+  #viewerFilmstrip .fcell.active{ border-color:var(--signal); }
   #viewerFilmstrip .fcell img{
     width:100%; height:64px; object-fit:cover; display:block;
   }
   #viewerFilmstrip .fcell .fcap{
     display:block; text-align:center;
-    font-size:10px; color:rgba(255,255,255,.75);
+    font:10px/1 var(--font-mono); color:var(--fg-dim);
     line-height:14px; padding-top:1px;
   }
   #viewer .loading{
-    position:absolute; left:12px; bottom:12px;
-    padding:6px 10px; border-radius:999px;
-    font-size:12px; color:rgba(255,255,255,.9);
-    background:rgba(0,0,0,.55);
-    border:1px solid rgba(255,255,255,.10);
+    position:absolute; left:14px; bottom:14px;
+    padding:6px 10px; border-radius:0;
+    font:11px/1 var(--font-mono);
+    color:var(--fg);
+    background:rgba(10,10,10,.85);
+    border:1px solid var(--rule);
     pointer-events:none; display:none; z-index:3;
   }
   #viewer.loading .loading{display:block}
   #viewer .badge{
-    position:absolute; right:12px; bottom:12px;
-    padding:6px 10px; border-radius:999px;
-    font-size:12px; color:rgba(255,255,255,.85);
-    background:rgba(0,0,0,.45);
-    border:1px solid rgba(255,255,255,.10);
+    position:absolute; right:14px; bottom:14px;
+    padding:6px 10px; border-radius:0;
+    font:11px/1 var(--font-mono);
+    color:var(--fg-dim);
+    background:rgba(10,10,10,.65);
+    border:1px solid var(--rule);
     pointer-events:none; display:none; z-index:3;
   }
   #viewer .badge.show{display:block}
-  #viewer .fav-on{color:#f6c445}
+  #viewer .fav-on{color:var(--fav)}
 
+  /* -------- Prompt panel -------- */
   #promptPanel{
     position:absolute; left:0; right:0; bottom:0;
     max-height:45vh; display:none; flex-direction:column;
-    background:rgba(0,0,0,.85);
-    border-top:1px solid rgba(255,255,255,.14);
-    backdrop-filter:blur(10px); z-index:4;
+    background:rgba(10,10,10,.94);
+    border-top:1px solid var(--rule);
+    backdrop-filter:blur(12px); z-index:4;
   }
   #viewer.showPrompt #promptPanel{display:flex}
   #promptPanel .phdr{
-    display:flex; align-items:center; gap:10px;
-    padding:8px 12px;
-    border-bottom:1px solid rgba(255,255,255,.08);
+    display:flex; align-items:center; gap:12px;
+    padding:10px 14px;
+    border-bottom:1px solid var(--rule);
   }
   #promptPanel .ptitle{
-    font-size:12px; color:rgba(255,255,255,.75);
-    letter-spacing:.3px; text-transform:uppercase;
+    font:600 10px/1 var(--font-ui);
+    letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted);
   }
-  #promptPanel .pcount{font-size:11px; color:rgba(255,255,255,.55)}
-  #promptPanel .pnav{display:flex; gap:6px; align-items:center}
-  #promptPanel .pnav button, #promptPanel .pact button{
-    border:1px solid rgba(255,255,255,.12);
-    background:rgba(255,255,255,.05);
-    color:rgba(255,255,255,.85);
-    border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer;
-  }
-  #promptPanel .pnav button:hover, #promptPanel .pact button:hover{background:rgba(255,255,255,.12)}
-  #promptPanel .pnav button[disabled]{opacity:.4; cursor:not-allowed}
-  #promptPanel .pact{margin-left:auto; display:flex; gap:6px}
+  #promptPanel .pcount{font:11px/1 var(--font-mono); color:var(--fg-dim)}
+  #promptPanel .pnav{display:flex; gap:4px; align-items:center}
+  #promptPanel .pact{margin-left:auto; display:flex; gap:4px}
   #promptText{
-    padding:10px 14px 14px;
+    padding:14px 16px 18px;
     overflow:auto;
-    font:12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    color:rgba(255,255,255,.92);
+    font:12.5px/1.6 var(--font-mono);
+    color:var(--fg);
     white-space:pre-wrap; word-break:break-word;
     user-select:text; max-height:calc(45vh - 44px);
   }
-  #promptText.empty{color:rgba(255,255,255,.45); font-style:italic}
+  #promptText.empty{color:var(--muted); font-style:italic}
 
+  /* -------- Shortcuts overlay -------- */
   #shortcuts{
-    position:absolute; top:50%; left:50%;
+    position:fixed; top:50%; left:50%;
     transform:translate(-50%,-50%);
-    background:rgba(0,0,0,.90); color:#fff;
-    padding:16px 24px; border-radius:10px; z-index:9999;
-    font:13px ui-monospace, monospace;
-    box-shadow:0 8px 40px rgba(0,0,0,.5);
+    background:var(--paper-2); color:var(--fg);
+    padding:20px 28px; border-radius:0; z-index:9999;
+    font:12.5px/1.5 var(--font-mono);
     display:none;
-    border:1px solid rgba(255,255,255,.18);
+    border:1px solid var(--rule);
+    min-width:420px;
   }
-  #shortcuts table{border-collapse:collapse}
-  #shortcuts td{padding:4px 14px}
-  #shortcuts td.k{color:#7cf; text-align:right; white-space:nowrap}
-  #shortcuts h3{margin:0 0 8px; font-size:13px; letter-spacing:.5px; text-transform:uppercase; color:#aaa}
+  #shortcuts table{border-collapse:collapse; width:100%}
+  #shortcuts td{padding:4px 14px; border-bottom:1px solid var(--rule)}
+  #shortcuts tr:last-child td{border-bottom:none}
+  #shortcuts td.k{
+    color:var(--signal-fg); text-align:right; white-space:nowrap;
+    font:600 12px/1 var(--font-mono);
+  }
+  #shortcuts h3{
+    margin:0 0 14px;
+    font:600 10px/1 var(--font-ui);
+    letter-spacing:.16em; text-transform:uppercase;
+    color:var(--muted);
+  }
+  #shortcuts h3::before{
+    content:"—";
+    display:inline-block; margin-right:8px;
+    color:var(--signal);
+  }
 </style>
 </head>
 <body>
 
 <div class="bar" id="topBar">
   <div class="row" id="row1">
-    <button id="pickBtn" class="btn" title="Open folder (or drag a folder onto the window)">Open folder</button>
+    <button id="pickBtn" class="btn" title="Open a folder (or drop one on the window)">Open folder</button>
+    <div class="divider"></div>
     <div id="count" class="meta">0 images</div>
     <div id="viewCountWrap" class="meta" style="display:none"><span id="viewCount">0</span> shown</div>
+    <div id="selCount" class="meta" style="display:none">0 selected</div>
 
-    <div class="ctrl" title="Target columns">
+    <div class="spacer"></div>
+
+    <div class="ctrl" title="Column count">
       <label for="colSlider">Cols</label>
-      <input id="colSlider" type="range" min="1" max="8" step="1" value="4" title="Target column count" />
+      <input id="colSlider" type="range" min="1" max="8" step="1" value="4" />
       <div id="colVal" class="val">4</div>
     </div>
 
-    <div class="toggle" title="Multi-select">
-      <div class="tlabel">Multi</div>
-      <div id="msSwitch" class="switch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
-      <div id="selCount" class="meta" style="display:none">0 selected</div>
+    <div id="msSwitch" class="toggle" role="switch" aria-checked="false" tabindex="0" title="Multi-select (M)">
+      <span class="tlabel">Select</span>
+      <span class="switch"><span class="knob"></span></span>
     </div>
 
-    <div class="toggle" title="Scan every image for prompt metadata">
-      <div class="tlabel">Prefetch prompts</div>
-      <div id="pfSwitch" class="switch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
+    <div id="pfSwitch" class="toggle" role="switch" aria-checked="false" tabindex="0" title="Scan every image for prompt metadata">
+      <span class="tlabel">Prompts</span>
+      <span class="switch"><span class="knob"></span></span>
       <div id="pfProg" class="meta" style="display:none">0 / 0</div>
       <div id="pfEst" class="meta" style="display:none"></div>
     </div>
 
-    <div class="toggle" title="Scan every image for a dominant color signature">
-      <div class="tlabel">Prefetch colors</div>
-      <div id="pcSwitch" class="switch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
+    <div id="pcSwitch" class="toggle" role="switch" aria-checked="false" tabindex="0" title="Scan every image for a dominant color signature">
+      <span class="tlabel">Colors</span>
+      <span class="switch"><span class="knob"></span></span>
       <div id="pcProg" class="meta" style="display:none">0 / 0</div>
     </div>
 
-    <div class="toggle" title="Include images from subfolders when a folder is selected">
-      <div class="tlabel">Recursive</div>
-      <div id="recSwitch" class="switch" role="switch" aria-checked="true" tabindex="0"><div class="knob"></div></div>
-    </div>
+    <div class="divider"></div>
 
-    <button id="dlAllBtn" class="btn" style="display:none" title="Download selected images as a ZIP archive">Download selected (zip)</button>
-
-    <div class="spacer"></div>
-    <button id="helpBtn" class="btn" title="Show keyboard shortcuts">?</button>
+    <button id="dlAllBtn" class="btn" style="display:none" title="Download selected as a ZIP">Download</button>
+    <button id="delAllBtn" class="btn danger" style="display:none" title="Delete selected">Delete</button>
+    <button id="helpBtn" class="btn" title="Keyboard shortcuts">?</button>
   </div>
 
   <div class="row" id="row2">
+    <span class="eyebrow">Sort</span>
     <select id="sortBy" title="Sort by">
       <option value="name">Name</option>
       <option value="date">Date</option>
@@ -509,29 +806,49 @@
       <option value="area">Area</option>
       <option value="random">Random</option>
     </select>
-    <button id="sortDir" class="btn" title="Toggle sort direction (asc / desc)">↑</button>
+    <button id="sortDir" class="btn" title="Toggle sort direction">↑</button>
 
-    <input id="fnQuery" type="search" placeholder="Filename..." />
+    <div class="divider"></div>
 
-    <div id="fmtWrap" class="fmtWrap"></div>
+    <span class="eyebrow">Filter</span>
+    <input id="fnQuery" type="search" placeholder="Filename" />
+    <input id="kwQuery" type="search" placeholder="Prompt keywords" />
 
-    <select id="oriSel" title="Orientation filter">
+    <select id="oriSel" title="Orientation">
       <option value="all">Any orientation</option>
       <option value="portrait">Portrait</option>
       <option value="landscape">Landscape</option>
       <option value="square">Square</option>
     </select>
 
-    <input id="kwQuery" type="search" placeholder="Prompt keywords..." />
+    <div id="fmtWrap" class="fmtWrap"></div>
 
     <div id="colorStrip" class="colorStrip"></div>
 
-    <div id="folderStrip" class="folderStrip"></div>
-    <div id="depthLegend" class="depthLegend" aria-hidden="true"></div>
+    <div id="recSwitch" class="toggle" role="switch" aria-checked="true" tabindex="0" title="Include subfolders when a folder is selected">
+      <span class="tlabel">Recursive</span>
+      <span class="switch"><span class="knob"></span></span>
+    </div>
 
-    <button id="favOnly" class="btn" title="Show favorites only">★ only</button>
+    <div class="spacer"></div>
+
+    <button id="favOnly" class="btn" title="Show favorites only">★ Favorites</button>
     <button id="resetFilters" class="btn" title="Clear all filters">Reset</button>
   </div>
+
+  <div id="folderRow" class="folderRow hidden">
+    <span class="eyebrow">Path</span>
+    <div id="folderCrumbs" class="folderCrumbs"></div>
+    <div class="divider"></div>
+    <span class="eyebrow">Subfolders</span>
+    <div id="folderStrip" class="folderStrip"></div>
+    <div class="folderRowActions">
+      <button id="folderUpBtn" class="folderMore" title="Go up one folder" style="display:none">↑ Up</button>
+      <button id="folderModeBtn" class="folderMore" title="Toggle wrap vs. scroll">Wrap</button>
+    </div>
+  </div>
+
+  <div id="depthLegend" class="depthLegend" aria-hidden="true"></div>
 </div>
 
 <input id="dirInput" type="file" multiple webkitdirectory hidden />
@@ -558,14 +875,39 @@
   <button id="quotaToastClose" class="btn">Dismiss</button>
 </div>
 
+<div id="folderToast">
+  <span class="eyebrow">Folder path copied</span>
+  <span id="folderToastPath" class="meta"></span>
+  <button id="folderToastClose" class="btn">Dismiss</button>
+</div>
+
+<div id="loader" role="status" aria-live="polite">
+  <div class="row1">
+    <div id="loaderLbl" class="lbl">Scanning folder</div>
+    <div id="loaderNum" class="num">0</div>
+  </div>
+  <div class="bar"><div class="fill" id="loaderFill"></div></div>
+</div>
+
+<div id="confirmModal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="box">
+    <div class="eyebrow">Confirm</div>
+    <h3 id="confirmTitle">Delete image?</h3>
+    <div id="confirmMsg" class="msg"></div>
+    <div id="confirmList" class="list"></div>
+    <div class="actions">
+      <button id="confirmCancel" class="btn" type="button">Cancel</button>
+      <button id="confirmOk" class="btn danger" type="button">Delete</button>
+    </div>
+  </div>
+</div>
+
 <div id="empty">
-  <svg class="emptyArrow" viewBox="0 0 40 40" aria-hidden="true">
-    <path d="M36 32 Q22 30 10 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    <path d="M10 12 L8 20 M10 12 L18 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>
+  <div class="emptyIndex">01</div>
   <div class="emptyText">
-    <div class="emptyTitle">Pick a folder to begin.</div>
-    <div class="emptySub">Or drop a folder here.</div>
+    <div class="emptyEyebrow">Fast Gallery</div>
+    <div class="emptyTitle">Point at a folder. Browse thousands of images with no wait.</div>
+    <div class="emptySub">Open folder from the toolbar, or drop one anywhere on the window.</div>
   </div>
 </div>
 <div id="grid" aria-live="polite"></div>
@@ -589,8 +931,10 @@
 
     <button id="viewerFav" class="vBtn" type="button" title="Favorite (F)">☆</button>
     <button id="viewerCopy" class="vBtn" type="button" title="Copy path (C)">Copy</button>
+    <button id="viewerFolder" class="vBtn" type="button" title="Copy folder path (Shift+C)">Folder</button>
     <button id="viewerDl" class="vBtn" type="button" title="Download original">Download</button>
     <button id="viewerFull" class="vBtn" type="button" title="Full resolution">Full-res</button>
+    <button id="viewerDel" class="vBtn danger" type="button" title="Delete (Del)">Delete</button>
     <button id="viewerClose" class="vBtn close" type="button">Close</button>
   </div>
 
@@ -619,28 +963,34 @@
     <div id="promptText" class="empty">No prompt data.</div>
   </div>
 
-  <div id="shortcuts">
-    <h3>Shortcuts</h3>
-    <table>
-      <tr><td class="k">← / →</td><td>prev / next image</td></tr>
-      <tr><td class="k">P</td><td>toggle prompt panel</td></tr>
-      <tr><td class="k">← / →</td><td>cycle prompts (when panel open)</td></tr>
-      <tr><td class="k">F</td><td>toggle favorite</td></tr>
-      <tr><td class="k">C</td><td>copy path</td></tr>
-      <tr><td class="k">Esc</td><td>hide panel, then close viewer</td></tr>
-      <tr><td class="k">?</td><td>toggle this help</td></tr>
-      <tr><td class="k">+ / -</td><td>zoom in / out</td></tr>
-      <tr><td class="k">0</td><td>fit to window</td></tr>
-      <tr><td class="k">1</td><td>1:1 pixel view</td></tr>
-      <tr><td class="k">R / Shift+R</td><td>rotate 90° cw / ccw</td></tr>
-      <tr><td class="k">S</td><td>toggle slideshow</td></tr>
-      <tr><td class="k">T</td><td>toggle filmstrip</td></tr>
-      <tr><td class="k">Shift+Click</td><td>range select (multiselect)</td></tr>
-      <tr><td class="k">Ctrl+A</td><td>select all in view</td></tr>
-      <tr><td class="k">Ctrl+Shift+A</td><td>clear selection</td></tr>
-      <tr><td class="k">Esc (grid)</td><td>clear selection / exit multiselect</td></tr>
-    </table>
-  </div>
+
+</div>
+
+<div id="shortcuts">
+  <h3>Viewer</h3>
+  <table>
+    <tr><td class="k">← / →</td><td>Previous / next image</td></tr>
+    <tr><td class="k">P</td><td>Prompt panel</td></tr>
+    <tr><td class="k">F</td><td>Favorite</td></tr>
+    <tr><td class="k">C</td><td>Copy image path</td></tr>
+    <tr><td class="k">Shift+C</td><td>Copy folder path</td></tr>
+    <tr><td class="k">+ / -</td><td>Zoom in / out</td></tr>
+    <tr><td class="k">0 / 1</td><td>Fit / 1:1</td></tr>
+    <tr><td class="k">R / Shift+R</td><td>Rotate cw / ccw</td></tr>
+    <tr><td class="k">S</td><td>Slideshow</td></tr>
+    <tr><td class="k">T</td><td>Filmstrip</td></tr>
+    <tr><td class="k">Del</td><td>Delete image</td></tr>
+    <tr><td class="k">Esc</td><td>Close panel, then viewer</td></tr>
+  </table>
+  <h3 style="margin-top:20px">Grid</h3>
+  <table>
+    <tr><td class="k">Ctrl+A</td><td>Select all in view</td></tr>
+    <tr><td class="k">Ctrl+Shift+A</td><td>Clear selection</td></tr>
+    <tr><td class="k">Shift+Click</td><td>Range select</td></tr>
+    <tr><td class="k">Del</td><td>Delete selection</td></tr>
+    <tr><td class="k">Esc</td><td>Clear selection / exit select mode</td></tr>
+    <tr><td class="k">?</td><td>Toggle this help</td></tr>
+  </table>
 </div>
 
 <script>
@@ -676,6 +1026,11 @@ const oriSel    = document.getElementById('oriSel');
 const kwQuery   = document.getElementById('kwQuery');
 const colorStripEl = document.getElementById('colorStrip');
 const folderStripEl = document.getElementById('folderStrip');
+const folderRowEl = document.getElementById('folderRow');
+const folderCrumbsEl = document.getElementById('folderCrumbs');
+const folderUpBtn = document.getElementById('folderUpBtn');
+const folderModeBtn = document.getElementById('folderModeBtn');
+let folderStripMode = 'wrap'; // 'wrap' | 'scroll'
 const favOnlyBtn = document.getElementById('favOnly');
 const resetFiltersBtn = document.getElementById('resetFilters');
 const recSwitch = document.getElementById('recSwitch');
@@ -706,12 +1061,25 @@ const viewerTitle = document.getElementById('viewerTitle');
 const viewerDims  = document.getElementById('viewerDims');
 const viewerClose = document.getElementById('viewerClose');
 const viewerDl    = document.getElementById('viewerDl');
+const viewerDel   = document.getElementById('viewerDel');
+const delAllBtn   = document.getElementById('delAllBtn');
+const loaderEl = document.getElementById('loader');
+const loaderLbl = document.getElementById('loaderLbl');
+const loaderNum = document.getElementById('loaderNum');
+const loaderFill = document.getElementById('loaderFill');
+const confirmModal = document.getElementById('confirmModal');
+const confirmTitle = document.getElementById('confirmTitle');
+const confirmMsg   = document.getElementById('confirmMsg');
+const confirmList  = document.getElementById('confirmList');
+const confirmOk    = document.getElementById('confirmOk');
+const confirmCancel = document.getElementById('confirmCancel');
 const viewerFull  = document.getElementById('viewerFull');
 const viewerPrompt= document.getElementById('viewerPrompt');
 const viewerPrev  = document.getElementById('viewerPrev');
 const viewerNext  = document.getElementById('viewerNext');
 const viewerFav   = document.getElementById('viewerFav');
 const viewerCopy  = document.getElementById('viewerCopy');
+const viewerFolder = document.getElementById('viewerFolder');
 const viewerStage = document.getElementById('viewerStage');
 const viewerCanvas= document.getElementById('viewerCanvas');
 const viewerBadge = document.getElementById('viewerBadge');
@@ -849,13 +1217,18 @@ async function walkDirectoryFSA(dirHandle, onBatch, abortSignal, stats) {
           const pLc = path.toLowerCase();
           const slash = pLc.lastIndexOf("/");
           batch.push({
-            name, path, handle: child, file: null,
+            name, path, handle: child, parent: cur, file: null,
             ext: extOf(name).slice(1),
             size: undefined, lastModified: undefined,
             pathLc: pLc,
             folderLc: slash < 0 ? "" : pLc.slice(0, slash),
           });
           if (batch.length >= BATCH) await flush();
+        } else if (child.kind === 'file' && /^log\.html?$/i.test(name)) {
+          const pLc = path.toLowerCase();
+          const slash = pLc.lastIndexOf("/");
+          const folderLc = slash < 0 ? "" : pLc.slice(0, slash);
+          registerSidecar(folderLc, child);
         }
       }
     } catch (_) { if (stats) stats.walkErrors = (stats.walkErrors|0) + 1; }
@@ -1418,16 +1791,122 @@ async function extractPromptsForFile(file) {
     return [];
   } catch (_) { return []; }
 }
+
+// -------- Fooocus log.html sidecar --------
+// folderLc → Promise<Map<filenameLc, {prompt, negative, meta[]}>>
+const sidecarCache = new Map();
+// folderLc → File handle for log.html (registered during folder walk)
+const sidecarSources = new Map();
+
+function registerSidecar(folderLc, source) {
+  if (!source) return;
+  if (sidecarSources.has(folderLc)) return;
+  sidecarSources.set(folderLc, source);
+}
+function resetSidecars() {
+  sidecarCache.clear();
+  sidecarSources.clear();
+}
+
+function decodeEntities(s) {
+  if (!s) return "";
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+function stripTags(s) {
+  return decodeEntities(String(s || "").replace(/<[^>]+>/g, "").trim());
+}
+function parseFooocusLog(html) {
+  const map = new Map();
+  if (typeof html !== "string" || !html.length) return map;
+  // Split per <div id="..._png"> or _jpg blocks (or generic div-with-id followed by <hr>)
+  const blockRe = /<div\s+id="([^"]+)">\s*<hr>([\s\S]*?)<\/div>/gi;
+  let m;
+  while ((m = blockRe.exec(html)) !== null) {
+    const body = m[2];
+    const nameMatch = body.match(/<p>\s*([^<\s][^<]*\.(?:png|jpe?g|webp|gif|avif|bmp))\s*<\/p>/i);
+    if (!nameMatch) continue;
+    const filename = nameMatch[1].trim().toLowerCase();
+    const promptM = body.match(/<p>\s*Prompt:\s*<b>([\s\S]*?)<\/b>/i);
+    const negM = body.match(/<p>\s*Negative\s*Prompt:\s*<b>([\s\S]*?)<\/b>/i);
+    const prompt = promptM ? stripTags(promptM[1]) : "";
+    const negative = negM ? stripTags(negM[1]) : "";
+    // Gather other <p> metadata lines
+    const meta = [];
+    const pRe = /<p>([\s\S]*?)<\/p>/gi;
+    let pm;
+    while ((pm = pRe.exec(body)) !== null) {
+      const txt = stripTags(pm[1]);
+      if (!txt) continue;
+      if (/^prompt:/i.test(txt)) continue;
+      if (/^negative\s*prompt:/i.test(txt)) continue;
+      if (txt.toLowerCase() === filename) continue;
+      meta.push(txt);
+    }
+    map.set(filename, { prompt, negative, meta });
+  }
+  return map;
+}
+async function loadSidecarForFolder(folderLc) {
+  if (sidecarCache.has(folderLc)) return sidecarCache.get(folderLc);
+  const source = sidecarSources.get(folderLc);
+  if (!source) { sidecarCache.set(folderLc, Promise.resolve(new Map())); return sidecarCache.get(folderLc); }
+  const p = (async () => {
+    try {
+      let file;
+      if (source instanceof File) file = source;
+      else if (source && typeof source.getFile === 'function') file = await source.getFile();
+      else return new Map();
+      const text = await file.text();
+      return parseFooocusLog(text);
+    } catch (err) {
+      console.warn("sidecar load failed:", folderLc, err);
+      return new Map();
+    }
+  })();
+  sidecarCache.set(folderLc, p);
+  return p;
+}
+async function sidecarEntryForIndex(i) {
+  const entry = files[i];
+  if (!entry) return null;
+  const folderLc = entry.folderLc || "";
+  if (!sidecarSources.has(folderLc)) return null;
+  const map = await loadSidecarForFolder(folderLc);
+  return map.get((entry.name || "").toLowerCase()) || null;
+}
+function mergeSidecarIntoPrompts(list, sidecar) {
+  if (!sidecar) return list;
+  const out = [];
+  const seen = new Set();
+  const push = (t) => { if (!t) return; const k = t.trim(); if (!k || seen.has(k)) return; seen.add(k); out.push(k); };
+  if (sidecar.prompt) push(sidecar.prompt);
+  if (sidecar.negative) push("Negative: " + sidecar.negative);
+  for (const l of list || []) push(l);
+  if (sidecar.meta && sidecar.meta.length) push(sidecar.meta.join("\n"));
+  return out;
+}
+
 function ensurePrompts(i) {
   if (prompts[i]) return Promise.resolve(prompts[i]);
   if (promptsP[i]) return promptsP[i];
   promptsP[i] = (async () => {
+    let list = [];
     try {
       const f = await getFileForEntry(files[i]);
-      const list = await extractPromptsForFile(f);
-      prompts[i] = list;
-      return list;
-    } catch (_) { prompts[i] = []; return prompts[i]; }
+      list = await extractPromptsForFile(f);
+    } catch (_) {}
+    try {
+      const side = await sidecarEntryForIndex(i);
+      if (side) list = mergeSidecarIntoPrompts(list, side);
+    } catch (_) {}
+    prompts[i] = list;
+    return list;
   })();
   return promptsP[i];
 }
@@ -1513,7 +1992,7 @@ const filterState = (() => {
     sortBy:'name', sortDir:'asc', query:'', formats:null,
     orientation:'all', colors:new Set(), keyword:'',
     favoritesOnly:false, randomSeed:1,
-    folders:new Set(), recursive:true,
+    currentPath:'', recursive:true,
   };
   try {
     const raw = localStorage.getItem('fast_gallery_view');
@@ -1527,7 +2006,7 @@ const filterState = (() => {
       if (Array.isArray(p.colors)) d.colors = new Set(p.colors);
       if (typeof p.keyword === 'string') d.keyword = p.keyword;
       if (typeof p.favoritesOnly === 'boolean') d.favoritesOnly = p.favoritesOnly;
-      if (Array.isArray(p.folders)) d.folders = new Set(p.folders);
+      if (typeof p.currentPath === 'string') d.currentPath = p.currentPath;
       if (typeof p.recursive === 'boolean') d.recursive = p.recursive;
     }
   } catch (_) {}
@@ -1543,7 +2022,7 @@ function saveFilterState() {
       colors:Array.from(filterState.colors),
       keyword:filterState.keyword,
       favoritesOnly:filterState.favoritesOnly,
-      folders:Array.from(filterState.folders),
+      currentPath:filterState.currentPath,
       recursive:filterState.recursive,
     }));
   } catch (_) {}
@@ -1594,17 +2073,18 @@ function buildView() {
     const q = filterState.query.toLowerCase();
     out = out.filter(i => (files[i].pathLc || "").includes(q));
   }
-  if (filterState.folders.size > 0) {
+  {
     const rec = filterState.recursive;
-    const sels = Array.from(filterState.folders, s => String(s).toLowerCase());
-    out = out.filter(i => {
-      const f = files[i].folderLc || "";
-      for (const sel of sels) {
-        if (rec) { if (f === sel || (sel === "" ? true : f.startsWith(sel + "/"))) return true; }
-        else { if (f === sel) return true; }
-      }
-      return false;
-    });
+    const cp = String(filterState.currentPath || "").toLowerCase();
+    if (cp !== "") {
+      out = out.filter(i => {
+        const f = files[i].folderLc || "";
+        if (rec) return f === cp || f.startsWith(cp + "/");
+        return f === cp;
+      });
+    } else if (!rec) {
+      out = out.filter(i => (files[i].folderLc || "") === "");
+    }
   }
   if (filterState.orientation !== 'all') {
     const o = filterState.orientation;
@@ -1738,8 +2218,11 @@ function makeTileNode() {
   const dl = document.createElement('button');
   dl.type = 'button'; dl.className = 'dl'; dl.title = 'Download';
   dl.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M12 3v10m0 0 4-4m-4 4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3h16v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  const del = document.createElement('button');
+  del.type = 'button'; del.className = 'del'; del.title = 'Delete';
+  del.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   tile.appendChild(img); tile.appendChild(num); tile.appendChild(dim);
-  tile.appendChild(pchip); tile.appendChild(fchip); tile.appendChild(star); tile.appendChild(selWrap); tile.appendChild(dl);
+  tile.appendChild(pchip); tile.appendChild(fchip); tile.appendChild(star); tile.appendChild(selWrap); tile.appendChild(dl); tile.appendChild(del);
   return tile;
 }
 
@@ -1904,6 +2387,7 @@ function updateSelectionUI() {
   selCount.style.display = multiselect ? "block" : "none";
   selCount.textContent = `${n} selected`;
   dlAllBtn.style.display = (multiselect && n > 0) ? "inline-block" : "none";
+  delAllBtn.style.display = (multiselect && n > 0) ? "inline-block" : "none";
   syncBarHeight();
 }
 function setMultiselect(on) {
@@ -1938,6 +2422,153 @@ async function downloadIndex(i) {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 12000);
   } catch (_) {}
+}
+
+// =====================================================================
+// Delete
+// =====================================================================
+let confirmPending = null;
+function openConfirmModal({title, message, listItems, dangerLabel, onConfirm}) {
+  confirmTitle.textContent = title || "Confirm";
+  confirmMsg.innerHTML = message || "";
+  confirmList.textContent = (listItems && listItems.length) ? listItems.join("\n") : "";
+  confirmOk.textContent = dangerLabel || "Delete";
+  confirmPending = onConfirm || null;
+  confirmModal.classList.add('open');
+  confirmModal.setAttribute('aria-hidden', 'false');
+  setTimeout(() => confirmCancel.focus(), 0);
+}
+function closeConfirmModal() {
+  confirmModal.classList.remove('open');
+  confirmModal.setAttribute('aria-hidden', 'true');
+  confirmPending = null;
+}
+confirmCancel.addEventListener('click', closeConfirmModal);
+confirmModal.addEventListener('click', (e) => {
+  if (e.target === confirmModal) closeConfirmModal();
+});
+confirmOk.addEventListener('click', async () => {
+  const fn = confirmPending;
+  closeConfirmModal();
+  if (fn) { try { await fn(); } catch (err) { console.error(err); } }
+});
+
+function canDeleteFromDisk(entry) {
+  return !!(entry && entry.parent && entry.handle && typeof entry.parent.removeEntry === 'function');
+}
+async function deleteEntryFromDisk(entry) {
+  if (!canDeleteFromDisk(entry)) return { ok: false, reason: "no-handle" };
+  try {
+    await entry.parent.removeEntry(entry.name);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: (err && err.name) || "error", err };
+  }
+}
+
+async function performDeleteIndexes(indexes) {
+  const uniq = Array.from(new Set(indexes.filter(isValidIndex))).sort((a,b) => a - b);
+  if (!uniq.length) return;
+  const results = { diskOk: 0, diskFail: 0, listOnly: 0, failedNames: [] };
+
+  for (const i of uniq) {
+    const entry = files[i];
+    if (canDeleteFromDisk(entry)) {
+      const r = await deleteEntryFromDisk(entry);
+      if (r.ok) results.diskOk++;
+      else { results.diskFail++; results.failedNames.push(entry.name + ": " + r.reason); }
+    } else {
+      results.listOnly++;
+    }
+  }
+
+  const removeSet = new Set(uniq);
+  let favTouched = false;
+  for (const i of uniq) {
+    const p = files[i]?.path;
+    if (p && favorites.has(p)) { favorites.delete(p); favTouched = true; }
+  }
+  if (favTouched) saveFavoritesFor(rootKey, favorites);
+  const keep = [];
+  const idxMap = new Map();
+  for (let i = 0; i < files.length; i++) {
+    if (removeSet.has(i)) continue;
+    idxMap.set(i, keep.length);
+    keep.push(i);
+  }
+  const remapArr = (src) => {
+    const dst = new Array(keep.length);
+    for (let j = 0; j < keep.length; j++) dst[j] = src[keep[j]];
+    return dst;
+  };
+  files = keep.map(i => files[i]);
+  dims = remapArr(dims);
+  dimsP = remapArr(dimsP);
+  prompts = remapArr(prompts);
+  promptsP = remapArr(promptsP);
+  colors = remapArr(colors);
+
+  const newSelected = new Set();
+  for (const s of selected) {
+    if (removeSet.has(s)) continue;
+    const nm = idxMap.get(s);
+    if (nm != null) newSelected.add(nm);
+  }
+  selected.clear();
+  for (const s of newSelected) selected.add(s);
+  lastSelectedK = -1;
+
+  countEl.textContent = `${files.length} image${files.length === 1 ? "" : "s"}`;
+  empty.style.display = files.length ? "none" : "block";
+  refreshFormatChips();
+  renderFolderStrip();
+  updateSelectionUI();
+  applyFilters();
+
+  if (viewer.classList.contains('open')) {
+    if (!files.length) {
+      closeViewer();
+    } else {
+      const nextPos = Math.min(currentViewPos, (view.length ? view.length - 1 : 0));
+      if (view.length) openViewer(view[nextPos], nextPos);
+      else closeViewer();
+    }
+  }
+
+  if (results.diskFail) {
+    console.warn("Delete failures:", results.failedNames);
+  }
+  if (results.listOnly && !results.diskOk && !results.diskFail) {
+    console.warn("Removed from gallery only (no filesystem handle).");
+  }
+}
+
+function confirmAndDeleteIndexes(indexes) {
+  const uniq = Array.from(new Set(indexes.filter(isValidIndex)));
+  if (!uniq.length) return;
+  const n = uniq.length;
+  const diskCount = uniq.filter(i => canDeleteFromDisk(files[i])).length;
+  const listOnly = n - diskCount;
+
+  const parts = [];
+  if (diskCount > 0) {
+    parts.push(`<span class="warn"><b>${diskCount}</b> file${diskCount===1?"":"s"} will be permanently deleted from disk.</span>`);
+  }
+  if (listOnly > 0) {
+    parts.push(`<b>${listOnly}</b> file${listOnly===1?"":"s"} will be removed from the gallery only (no filesystem handle — dropped from a browser without directory permission).`);
+  }
+  parts.push("This cannot be undone.");
+
+  const names = uniq.slice(0, 20).map(i => files[i].path || files[i].name);
+  const extra = uniq.length > names.length ? `\n… and ${uniq.length - names.length} more` : "";
+
+  openConfirmModal({
+    title: n === 1 ? "Delete image?" : `Delete ${n} images?`,
+    message: parts.join("<br>"),
+    listItems: [names.join("\n") + extra],
+    dangerLabel: n === 1 ? "Delete" : `Delete ${n}`,
+    onConfirm: () => performDeleteIndexes(uniq),
+  });
 }
 
 // =====================================================================
@@ -2415,6 +3046,9 @@ function prevInView() {
 
 viewerClose.addEventListener('click', closeViewer);
 viewerDl.addEventListener('click', () => downloadIndex(currentIndex));
+viewerDel.addEventListener('click', () => {
+  if (isValidIndex(currentIndex)) confirmAndDeleteIndexes([currentIndex]);
+});
 viewerFull.addEventListener('click', () => {
   if (!isValidIndex(currentIndex) || isFullRes) return;
   isFullRes = true; updateViewerButtons(currentIndex);
@@ -2450,20 +3084,51 @@ viewerFilmstrip.addEventListener('click', (e) => {
 });
 updateSlideshowBtn();
 viewerFav.addEventListener('click', toggleFavForCurrent);
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.top = '-1000px';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) {}
+    ta.remove();
+    return ok;
+  }
+}
 viewerCopy.addEventListener('click', async () => {
   if (!isValidIndex(currentIndex)) return;
   const p = files[currentIndex].path;
   const orig = viewerCopy.textContent;
-  try { await navigator.clipboard.writeText(p); }
-  catch (_) {
-    const ta = document.createElement('textarea');
-    ta.value = p; ta.style.position = 'fixed'; ta.style.top = '-1000px';
-    document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); } catch (_) {}
-    ta.remove();
-  }
+  await copyText(p);
   viewerCopy.textContent = "Copied";
   setTimeout(() => { viewerCopy.textContent = orig; }, 900);
+});
+
+const folderToast = document.getElementById('folderToast');
+const folderToastPath = document.getElementById('folderToastPath');
+const folderToastClose = document.getElementById('folderToastClose');
+folderToastClose.addEventListener('click', () => { folderToast.style.display = 'none'; });
+
+function folderPathForIndex(i) {
+  if (!isValidIndex(i)) return "";
+  const rel = folderOf(files[i].path || files[i].name || "");
+  return rel;
+}
+async function revealFolderForIndex(i) {
+  if (!isValidIndex(i)) return;
+  const rel = folderPathForIndex(i);
+  const label = rel || "(root)";
+  await copyText(rel);
+  folderToastPath.textContent = label;
+  folderToast.style.display = 'flex';
+}
+viewerFolder.addEventListener('click', async () => {
+  if (!isValidIndex(currentIndex)) return;
+  const orig = viewerFolder.textContent;
+  await revealFolderForIndex(currentIndex);
+  viewerFolder.textContent = "Copied";
+  setTimeout(() => { viewerFolder.textContent = orig; }, 900);
 });
 
 pClose.addEventListener('click', () => showPromptPanel(false));
@@ -2525,6 +3190,7 @@ window.addEventListener('keydown', (e) => {
       return;
     }
     if (e.key === 'Escape') {
+      if (confirmModal.classList.contains('open')) { closeConfirmModal(); return; }
       if (shortcutsEl.style.display === 'block') { shortcutsEl.style.display = 'none'; return; }
       if (multiselect && selected.size > 0) {
         selected.clear();
@@ -2534,6 +3200,14 @@ window.addEventListener('keydown', (e) => {
       } else if (multiselect) {
         setMultiselect(false);
         lastSelectedK = -1;
+      }
+      return;
+    }
+    if (e.key === 'Delete') {
+      if (confirmModal.classList.contains('open')) return;
+      if (multiselect && selected.size > 0) {
+        confirmAndDeleteIndexes(Array.from(selected));
+        e.preventDefault();
       }
       return;
     }
@@ -2548,7 +3222,11 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'p' || e.key === 'P') { viewerPrompt.click(); return; }
   if (e.key === 'f' || e.key === 'F') { toggleFavForCurrent(); return; }
-  if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) { viewerCopy.click(); return; }
+  if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
+    if (e.shiftKey) { viewerFolder.click(); }
+    else { viewerCopy.click(); }
+    return;
+  }
   if (e.key === 's' || e.key === 'S') { toggleSlideshow(); e.preventDefault(); return; }
   if (e.key === 't' || e.key === 'T') { toggleFilmstrip(); e.preventDefault(); return; }
   if (e.key === '+' || e.key === '=') {
@@ -2585,6 +3263,11 @@ window.addEventListener('keydown', (e) => {
     if (showingPromptPanel) { pNext.click(); e.preventDefault(); return; }
     manualNext(); e.preventDefault(); return;
   }
+  if (e.key === 'Delete') {
+    if (confirmModal.classList.contains('open')) return;
+    if (isValidIndex(currentIndex)) confirmAndDeleteIndexes([currentIndex]);
+    e.preventDefault(); return;
+  }
 });
 helpBtn.addEventListener('click', () => {
   shortcutsEl.style.display = shortcutsEl.style.display === 'block' ? 'none' : 'block';
@@ -2601,6 +3284,20 @@ grid.addEventListener('click', (ev) => {
     ev.preventDefault(); ev.stopPropagation();
     const i = Number(tile.dataset.index);
     downloadIndex(i);
+    return;
+  }
+  const delBtn = ev.target.closest('.del');
+  if (delBtn) {
+    const tile = delBtn.closest('.tile');
+    if (!tile) return;
+    ev.preventDefault(); ev.stopPropagation();
+    const i = Number(tile.dataset.index);
+    if (!isValidIndex(i)) return;
+    if (multiselect && selected.has(i) && selected.size > 1) {
+      confirmAndDeleteIndexes(Array.from(selected));
+    } else {
+      confirmAndDeleteIndexes([i]);
+    }
     return;
   }
   const star = ev.target.closest('.star');
@@ -2708,7 +3405,7 @@ function doResetFilters() {
   filterState.formats = null; refreshFormatChips();
   filterState.colors.clear(); renderColorStrip();
   filterState.favoritesOnly = false; favOnlyBtn.classList.remove('on');
-  filterState.folders.clear(); renderFolderStrip();
+  filterState.currentPath = ""; renderFolderStrip();
   filterState.recursive = true; syncRecSwitch();
   saveFilterState(); applyFilters();
 }
@@ -2776,36 +3473,125 @@ function renderColorStrip() {
 }
 renderColorStrip();
 
+function navigateFolder(path) {
+  filterState.currentPath = String(path || "");
+  saveFilterState();
+  renderFolderStrip();
+  applyFilters();
+  window.scrollTo({top:0});
+}
+
 function renderFolderStrip() {
   while (folderStripEl.firstChild) folderStripEl.removeChild(folderStripEl.firstChild);
-  if (!files.length) return;
-  const set = new Set();
-  for (const f of files) set.add(folderOf(f.path));
-  const list = Array.from(set).sort((a, b) => a.localeCompare(b));
-  // Prune stale selections not present in the current folder set.
-  let mutated = false;
-  for (const sel of Array.from(filterState.folders)) {
-    if (!set.has(sel)) { filterState.folders.delete(sel); mutated = true; }
+  while (folderCrumbsEl.firstChild) folderCrumbsEl.removeChild(folderCrumbsEl.firstChild);
+  if (!files.length) { folderRowEl.classList.add('hidden'); syncBarHeight(); return; }
+
+  const allFolders = new Set();
+  for (const f of files) allFolders.add(folderOf(f.path));
+
+  // Clamp currentPath to something that exists as a prefix
+  const cpRaw = String(filterState.currentPath || "");
+  const cpLc = cpRaw.toLowerCase();
+  let cpValid = cpRaw === "";
+  if (!cpValid) {
+    for (const f of allFolders) {
+      const fLc = f.toLowerCase();
+      if (fLc === cpLc || fLc.startsWith(cpLc + "/")) { cpValid = true; break; }
+    }
   }
-  if (mutated) saveFilterState();
-  if (list.length <= 1) return;
-  for (const folder of list) {
+  if (!cpValid) {
+    filterState.currentPath = "";
+    saveFilterState();
+  }
+  const currentPath = filterState.currentPath;
+  const currentLc = currentPath.toLowerCase();
+
+  // Compute direct subfolders of currentPath
+  const childSet = new Set();
+  for (const f of allFolders) {
+    if (f === "") continue;
+    if (currentPath === "") {
+      const segs = f.split('/');
+      if (segs.length >= 1) childSet.add(segs[0]);
+    } else {
+      const fLc = f.toLowerCase();
+      if (fLc === currentLc) continue;
+      if (!fLc.startsWith(currentLc + "/")) continue;
+      const rest = f.slice(currentPath.length + 1);
+      const seg = rest.split('/')[0];
+      if (seg) childSet.add(currentPath + "/" + seg);
+    }
+  }
+  const children = Array.from(childSet).sort((a, b) => a.localeCompare(b));
+
+  const hasCrumbs = currentPath !== "";
+  const hasChildren = children.length > 0;
+  if (!hasCrumbs && !hasChildren) {
+    folderRowEl.classList.add('hidden');
+    syncBarHeight();
+    return;
+  }
+  folderRowEl.classList.remove('hidden');
+
+  // Breadcrumbs
+  const rootCrumb = document.createElement('button');
+  rootCrumb.type = 'button';
+  rootCrumb.className = 'crumb' + (currentPath === "" ? ' current' : '');
+  rootCrumb.textContent = '▸ root';
+  rootCrumb.title = 'Root';
+  rootCrumb.addEventListener('click', () => navigateFolder(""));
+  folderCrumbsEl.appendChild(rootCrumb);
+  if (currentPath !== "") {
+    const parts = currentPath.split('/');
+    let accum = "";
+    for (let i = 0; i < parts.length; i++) {
+      const sep = document.createElement('span');
+      sep.className = 'crumbSep';
+      sep.textContent = '/';
+      folderCrumbsEl.appendChild(sep);
+      accum = accum ? accum + "/" + parts[i] : parts[i];
+      const c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'crumb' + (i === parts.length - 1 ? ' current' : '');
+      c.textContent = parts[i];
+      c.title = accum;
+      const target = accum;
+      c.addEventListener('click', () => navigateFolder(target));
+      folderCrumbsEl.appendChild(c);
+    }
+  }
+
+  // Subfolder chips
+  folderStripEl.classList.toggle('scroll', folderStripMode === 'scroll');
+  folderStripEl.classList.toggle('expanded', folderStripMode === 'scroll');
+
+  for (const child of children) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'folderChip' + (folder === '' ? ' root' : '');
-    btn.textContent = folder === '' ? '▸ root' : (folder.split('/').pop() || folder);
-    btn.title = folder === '' ? '(root)' : folder;
-    if (filterState.folders.has(folder)) btn.classList.add('on');
-    btn.addEventListener('click', () => {
-      if (filterState.folders.has(folder)) filterState.folders.delete(folder);
-      else filterState.folders.add(folder);
-      btn.classList.toggle('on');
-      saveFilterState(); applyFilters();
-    });
+    btn.className = 'folderChip';
+    const label = child.split('/').pop();
+    btn.textContent = label;
+    btn.title = child;
+    btn.addEventListener('click', () => navigateFolder(child));
     folderStripEl.appendChild(btn);
   }
+
+  folderUpBtn.style.display = currentPath === "" ? 'none' : '';
+  folderUpBtn.onclick = () => {
+    const p = currentPath.split('/');
+    p.pop();
+    navigateFolder(p.join('/'));
+  };
+  folderModeBtn.textContent = folderStripMode === 'wrap' ? 'Wrap' : 'Scroll';
+
   renderDepthLegend();
+  syncBarHeight();
 }
+
+folderModeBtn.addEventListener('click', () => {
+  folderStripMode = folderStripMode === 'wrap' ? 'scroll' : 'wrap';
+  renderFolderStrip();
+});
 
 const DEPTH_TINTS = [
   null,
@@ -3129,6 +3915,36 @@ async function downloadSelectedZip() {
   finally { dlAllBtn.disabled = false; dlAllBtn.textContent = old; }
 }
 dlAllBtn.addEventListener('click', downloadSelectedZip);
+delAllBtn.addEventListener('click', () => {
+  if (selected.size > 0) confirmAndDeleteIndexes(Array.from(selected));
+});
+
+// =====================================================================
+// Loader UI
+// =====================================================================
+function loaderShow(label) {
+  loaderLbl.textContent = label || "Working";
+  loaderNum.textContent = "";
+  loaderFill.style.width = "0%";
+  loaderEl.classList.add('open', 'indet');
+}
+function loaderScanning(count) {
+  loaderEl.classList.add('open', 'indet');
+  loaderLbl.textContent = "Scanning folder";
+  loaderNum.textContent = count > 0 ? `${count.toLocaleString()} images` : "";
+  loaderFill.style.width = "0%";
+}
+function loaderProgress(label, done, total) {
+  loaderEl.classList.add('open');
+  loaderEl.classList.remove('indet');
+  loaderLbl.textContent = label || "Loading";
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  loaderNum.textContent = total > 0 ? `${done.toLocaleString()} / ${total.toLocaleString()}` : "";
+  loaderFill.style.width = pct + "%";
+}
+function loaderHide() {
+  loaderEl.classList.remove('open', 'indet');
+}
 
 // =====================================================================
 // Load pipeline
@@ -3136,6 +3952,7 @@ dlAllBtn.addEventListener('click', downloadSelectedZip);
 async function resetAndLoadFiles(entries, key) {
   if (prefetchAbort) { prefetchAbort.aborted = true; prefetchAbort = null; }
   if (prefetchColorsAbort) { prefetchColorsAbort.aborted = true; prefetchColorsAbort = null; }
+  sidecarCache.clear();
   files = entries;
   dims = new Array(files.length);
   dimsP = new Array(files.length);
@@ -3156,19 +3973,31 @@ async function resetAndLoadFiles(entries, key) {
   updatePrefetchUI();
   updatePrefetchColorsUI();
 
-  await ensureFirstDims(400);
+  if (files.length) {
+    const first = Math.min(400, files.length);
+    loaderProgress("Reading image dimensions", 0, first);
+    await ensureFirstDims(first, (done, total) => {
+      loaderProgress("Reading image dimensions", done, total);
+    });
+  }
 
   applyFilters();
+  loaderHide();
 
   if (prefetchActive && files.length) startPrefetchPrompts();
   if (prefetchColorsActive && files.length) startPrefetchColors();
 }
 
-async function ensureFirstDims(n) {
+async function ensureFirstDims(n, onProgress) {
   const upto = Math.min(n, files.length);
   const idxs = [];
   for (let i = 0; i < upto; i++) idxs.push(i);
-  await mapLimit(idxs, 16, ensureDims);
+  let done = 0;
+  await mapLimit(idxs, 16, async (i) => {
+    await ensureDims(i);
+    done++;
+    if (onProgress && (done === upto || (done & 15) === 0)) onProgress(done, upto);
+  });
   ensureRestDimsInBackground(upto);
 }
 async function ensureRestDimsInBackground(startFrom) {
@@ -3185,13 +4014,24 @@ async function loadViaFSA(dirHandle) {
   currentRootHandle = dirHandle;
   permissionLost = false;
   permBanner.style.display = "none";
+  resetSidecars();
+  loaderScanning(0);
   const collected = [];
   const stats = { walkErrors: 0 };
-  await walkDirectoryFSA(dirHandle, (batch) => {
-    for (const e of batch) collected.push(e);
-  }, undefined, stats);
-  collected.sort((a,b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
-  await resetAndLoadFiles(collected, "fsa:" + (dirHandle.name || "root"));
+  let lastScanUpd = 0;
+  try {
+    await walkDirectoryFSA(dirHandle, (batch) => {
+      for (const e of batch) collected.push(e);
+      const n = collected.length;
+      if (n - lastScanUpd >= 100 || n === 0) { lastScanUpd = n; loaderScanning(n); }
+    }, undefined, stats);
+    loaderScanning(collected.length);
+    loaderShow("Sorting");
+    collected.sort((a,b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
+    await resetAndLoadFiles(collected, "fsa:" + (dirHandle.name || "root"));
+  } finally {
+    loaderHide();
+  }
   if (stats.walkErrors > 0) {
     walkToastText.textContent = `Skipped ${stats.walkErrors} folder${stats.walkErrors === 1 ? "" : "s"} (permission or read error)`;
     walkToast.style.display = "flex";
@@ -3201,30 +4041,47 @@ async function loadViaFSA(dirHandle) {
 }
 
 async function loadViaWebkitDirectory(fileList) {
-  const list = Array.from(fileList || []).filter(f => isImage(f.name));
-  list.sort((a,b) => {
-    const pa = (a.webkitRelativePath || a.name).toLowerCase();
-    const pb = (b.webkitRelativePath || b.name).toLowerCase();
-    return pa < pb ? -1 : pa > pb ? 1 : 0;
-  });
-  const entries = list.map(f => {
-    const path = f.webkitRelativePath || f.name;
-    const pLc  = path.toLowerCase();
-    const slash = pLc.lastIndexOf("/");
-    return {
-      name: f.name,
-      path,
-      handle: null,
-      file: f,
-      ext: extOf(f.name).slice(1),
-      size: f.size,
-      lastModified: f.lastModified,
-      pathLc: pLc,
-      folderLc: slash < 0 ? "" : pLc.slice(0, slash),
-    };
-  });
-  const rootName = entries.length ? (entries[0].path.split("/")[0] || "") : "";
-  await resetAndLoadFiles(entries, "webkit:" + rootName);
+  resetSidecars();
+  loaderScanning(0);
+  try {
+    const raw = Array.from(fileList || []);
+    for (const f of raw) {
+      if (/^log\.html?$/i.test(f.name)) {
+        const rel = (f.webkitRelativePath || f.name).toLowerCase();
+        const slash = rel.lastIndexOf("/");
+        const folderLc = slash < 0 ? "" : rel.slice(0, slash);
+        registerSidecar(folderLc, f);
+      }
+    }
+    const list = raw.filter(f => isImage(f.name));
+    loaderScanning(list.length);
+    loaderShow("Sorting");
+    list.sort((a,b) => {
+      const pa = (a.webkitRelativePath || a.name).toLowerCase();
+      const pb = (b.webkitRelativePath || b.name).toLowerCase();
+      return pa < pb ? -1 : pa > pb ? 1 : 0;
+    });
+    const entries = list.map(f => {
+      const path = f.webkitRelativePath || f.name;
+      const pLc  = path.toLowerCase();
+      const slash = pLc.lastIndexOf("/");
+      return {
+        name: f.name,
+        path,
+        handle: null,
+        file: f,
+        ext: extOf(f.name).slice(1),
+        size: f.size,
+        lastModified: f.lastModified,
+        pathLc: pLc,
+        folderLc: slash < 0 ? "" : pLc.slice(0, slash),
+      };
+    });
+    const rootName = entries.length ? (entries[0].path.split("/")[0] || "") : "";
+    await resetAndLoadFiles(entries, "webkit:" + rootName);
+  } finally {
+    loaderHide();
+  }
 }
 
 async function pickFolder() {
@@ -3247,63 +4104,178 @@ dirInput.addEventListener('change', async () => {
   await loadViaWebkitDirectory(dirInput.files);
 });
 
-async function walkDropEntry(entry, prefix) {
+async function walkDropEntry(entry, prefix, onFound) {
   const out = [];
   if (!entry) return out;
   if (entry.isFile) {
-    if (!isImage(entry.name)) return out;
-    const file = await new Promise((res, rej) => entry.file(res, rej));
+    const isLog = /^log\.html?$/i.test(entry.name || "");
+    if (!isImage(entry.name) && !isLog) return out;
+    let file;
+    try {
+      file = await new Promise((res, rej) => entry.file(res, rej));
+    } catch (err) {
+      console.warn("drop: skipped", entry.fullPath || entry.name, err);
+      return out;
+    }
+    if (!file) return out;
     const path = prefix ? prefix + "/" + entry.name : entry.name;
     const pLc = path.toLowerCase();
     const slash = pLc.lastIndexOf("/");
+    const folderLc = slash < 0 ? "" : pLc.slice(0, slash);
+    if (isLog) {
+      registerSidecar(folderLc, file);
+      return out;
+    }
     out.push({
       name: entry.name, path, handle: null, file,
       ext: extOf(entry.name).slice(1),
       size: file.size, lastModified: file.lastModified,
       pathLc: pLc,
-      folderLc: slash < 0 ? "" : pLc.slice(0, slash),
+      folderLc,
     });
+    if (onFound) onFound(1);
     return out;
   }
   if (entry.isDirectory) {
     const reader = entry.createReader();
     const nextPrefix = prefix ? prefix + "/" + entry.name : entry.name;
     while (true) {
-      const chunk = await new Promise((res, rej) => reader.readEntries(res, rej));
+      let chunk;
+      try {
+        chunk = await new Promise((res, rej) => reader.readEntries(res, rej));
+      } catch (err) {
+        console.warn("drop: dir read failed", entry.fullPath || entry.name, err);
+        break;
+      }
       if (!chunk.length) break;
       for (const child of chunk) {
-        const sub = await walkDropEntry(child, nextPrefix);
-        for (const e of sub) out.push(e);
+        try {
+          const sub = await walkDropEntry(child, nextPrefix, onFound);
+          for (const e of sub) out.push(e);
+        } catch (err) {
+          console.warn("drop: child walk failed", child?.name, err);
+        }
       }
     }
   }
   return out;
 }
-document.body.addEventListener('dragover', (e) => {
-  if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+function hasFileDrag(e) {
+  const t = e.dataTransfer?.types;
+  if (!t) return false;
+  for (let i = 0; i < t.length; i++) if (t[i] === 'Files') return true;
+  return false;
+}
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => {
+  if (!hasFileDrag(e)) return;
   e.preventDefault();
+  dragDepth++;
   document.body.classList.add('dropping');
 });
-document.documentElement.addEventListener('dragleave', (e) => {
-  if (e.target === document.documentElement || e.relatedTarget === null) {
-    document.body.classList.remove('dropping');
-  }
-});
-document.body.addEventListener('drop', async (e) => {
+window.addEventListener('dragover', (e) => {
+  if (!hasFileDrag(e)) return;
   e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+});
+window.addEventListener('dragleave', (e) => {
+  if (dragDepth === 0) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) document.body.classList.remove('dropping');
+});
+window.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  dragDepth = 0;
   document.body.classList.remove('dropping');
-  const items = e.dataTransfer?.items;
-  if (!items || !items.length) return;
-  const first = items[0];
-  const entry = first.webkitGetAsEntry ? first.webkitGetAsEntry() : null;
-  if (!entry) return;
-  const rootName = entry.name || "drop";
-  const collected = await walkDropEntry(entry, "");
-  collected.sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
-  if (!collected.length) return;
-  reopenBanner.style.display = "none";
-  currentRootHandle = null;
-  await resetAndLoadFiles(collected, "drop:" + rootName);
+  try {
+    const items = e.dataTransfer?.items;
+    if (!items || !items.length) return;
+
+    const fsaHandles = [];
+    const legacyEntries = [];
+    const plainFiles = [];
+
+    const rawItems = Array.from(items).filter(it => it.kind === 'file');
+    for (const it of rawItems) {
+      let handle = null;
+      if (typeof it.getAsFileSystemHandle === 'function') {
+        try { handle = await it.getAsFileSystemHandle(); } catch (_) { handle = null; }
+      }
+      if (handle) { fsaHandles.push(handle); continue; }
+      let entry = null;
+      try { entry = it.webkitGetAsEntry ? it.webkitGetAsEntry() : null; } catch (_) {}
+      if (entry) { legacyEntries.push(entry); continue; }
+      const f = it.getAsFile && it.getAsFile();
+      if (f && isImage(f.name)) plainFiles.push(f);
+    }
+
+    if (!fsaHandles.length && !legacyEntries.length && !plainFiles.length) return;
+
+    resetSidecars();
+    loaderScanning(0);
+
+    const collected = [];
+    let rootLabel = "";
+    let lastScanUpdate = 0;
+    const bumpScan = () => {
+      const n = collected.length;
+      if (n - lastScanUpdate < 25 && n > 0) return;
+      lastScanUpdate = n;
+      loaderScanning(n);
+    };
+
+    for (const h of fsaHandles) {
+      if (h.kind === 'directory') {
+        const stats = { walkErrors: 0 };
+        await walkDirectoryFSA(h, (batch) => {
+          for (const b of batch) collected.push(b);
+          bumpScan();
+        }, undefined, stats);
+        rootLabel = rootLabel || h.name;
+      } else if (h.kind === 'file' && IMAGE_EXT_RE.test(h.name)) {
+        collected.push({
+          name: h.name, path: h.name, handle: h, file: null,
+          ext: extOf(h.name).slice(1),
+          size: undefined, lastModified: undefined,
+          pathLc: h.name.toLowerCase(), folderLc: "",
+        });
+        bumpScan();
+        rootLabel = rootLabel || h.name;
+      }
+    }
+
+    for (const en of legacyEntries) {
+      const sub = await walkDropEntry(en, "", () => bumpScan());
+      for (const s of sub) collected.push(s);
+      rootLabel = rootLabel || (en.name || "drop");
+    }
+
+    for (const f of plainFiles) {
+      collected.push({
+        name: f.name, path: f.name, handle: null, file: f,
+        ext: extOf(f.name).slice(1),
+        size: f.size, lastModified: f.lastModified,
+        pathLc: f.name.toLowerCase(), folderLc: "",
+      });
+      bumpScan();
+      rootLabel = rootLabel || f.name;
+    }
+
+    if (!collected.length) { loaderHide(); return; }
+
+    loaderShow("Sorting");
+    collected.sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
+
+    const total = fsaHandles.length + legacyEntries.length + plainFiles.length;
+    const rootName = total === 1 ? (rootLabel || "drop") : `${total} items`;
+    reopenBanner.style.display = "none";
+    currentRootHandle = (fsaHandles.length === 1 && fsaHandles[0].kind === 'directory') ? fsaHandles[0] : null;
+    await resetAndLoadFiles(collected, "drop:" + rootName);
+  } catch (err) {
+    console.error("drop handler failed:", err);
+  } finally {
+    loaderHide();
+  }
 });
 
 // Restore last folder banner
