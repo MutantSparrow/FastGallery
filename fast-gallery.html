@@ -244,12 +244,57 @@
     box-shadow:0 0 0 1px rgba(255,255,255,.18) inset;
   }
 
-  #empty{padding:18px 12px; color:var(--muted)}
-  #reopenBanner{
+  #empty{
+    display:flex; align-items:center; gap:14px;
+    padding:24px 20px; min-height:120px;
+    color:var(--muted);
+  }
+  #empty .emptyArrow{
+    width:56px; height:56px; flex:0 0 auto;
+    color:rgba(255,255,255,.45);
+  }
+  #empty .emptyText{display:flex; flex-direction:column; gap:4px}
+  #empty .emptyTitle{font-size:15px; color:rgba(255,255,255,.82)}
+  #empty .emptySub{font-size:12px; color:var(--muted)}
+  body.dropping{
+    outline:2px dashed rgba(120,180,255,.55);
+    outline-offset:-8px;
+    background:rgba(80,140,220,.06);
+  }
+  body.dropping #empty{
+    background:rgba(80,140,220,.08);
+    border-radius:10px;
+  }
+  #reopenBanner, #permBanner{
     padding:10px 12px; margin:8px 12px;
     background:rgba(80,140,220,.10);
     border:1px solid rgba(80,140,220,.30);
     border-radius:8px; display:none; gap:10px; align-items:center;
+  }
+  #permBanner{
+    background:rgba(220,140,80,.10);
+    border-color:rgba(220,140,80,.35);
+  }
+  #walkToast, #quotaToast{
+    display:none; align-items:center; gap:8px;
+    padding:6px 10px; margin:6px 12px;
+    background:rgba(220,180,80,.10);
+    border:1px solid rgba(220,180,80,.35);
+    border-radius:8px; font-size:12px; color:rgba(255,255,255,.85);
+  }
+  #walkToast .btn, #quotaToast .btn{ padding:2px 8px; font-size:12px; }
+  #resetFilters.armed{
+    border-color:rgba(240,160,80,.55);
+    color:#f0a050;
+  }
+  .depthLegend{
+    display:flex; align-items:center; gap:3px;
+    padding:0 6px; min-height:14px;
+  }
+  .depthLegend:empty{display:none}
+  .depthLegend .dband{
+    width:3px; height:14px; border-radius:2px;
+    background:var(--stroke);
   }
 
   #viewer{
@@ -302,6 +347,40 @@
   #viewer.zoomed .stage{cursor:grab}
   #viewer.zoomed.dragging .stage{cursor:grabbing}
   #viewerCanvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+  #viewer #viewerImgOverlay{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:contain;
+    pointer-events:none;
+    display:none;
+    background:#000;
+    user-select:none;
+  }
+  #viewer #viewerFilmstrip{
+    position:absolute; left:0; right:0; bottom:0;
+    height:88px; display:none;
+    background:rgba(0,0,0,.68);
+    border-top:1px solid rgba(255,255,255,.10);
+    overflow-x:auto; overflow-y:hidden; white-space:nowrap;
+    padding:4px 8px; z-index:3;
+  }
+  #viewer.showFilmstrip #viewerFilmstrip{ display:block; }
+  #viewerFilmstrip .fcell{
+    display:inline-block; width:64px; height:80px;
+    margin-right:6px; border-radius:6px; overflow:hidden;
+    border:1px solid rgba(255,255,255,.10);
+    background:#000; cursor:pointer; position:relative;
+    vertical-align:top;
+  }
+  #viewerFilmstrip .fcell.active{ border-color:rgba(255,255,255,.85); }
+  #viewerFilmstrip .fcell img{
+    width:100%; height:64px; object-fit:cover; display:block;
+  }
+  #viewerFilmstrip .fcell .fcap{
+    display:block; text-align:center;
+    font-size:10px; color:rgba(255,255,255,.75);
+    line-height:14px; padding-top:1px;
+  }
   #viewer .loading{
     position:absolute; left:12px; bottom:12px;
     padding:6px 10px; border-radius:999px;
@@ -380,13 +459,13 @@
 
 <div class="bar" id="topBar">
   <div class="row" id="row1">
-    <button id="pickBtn" class="btn">Open folder</button>
+    <button id="pickBtn" class="btn" title="Open folder (or drag a folder onto the window)">Open folder</button>
     <div id="count" class="meta">0 images</div>
     <div id="viewCountWrap" class="meta" style="display:none"><span id="viewCount">0</span> shown</div>
 
     <div class="ctrl" title="Target columns">
       <label for="colSlider">Cols</label>
-      <input id="colSlider" type="range" min="1" max="8" step="1" value="4" />
+      <input id="colSlider" type="range" min="1" max="8" step="1" value="4" title="Target column count" />
       <div id="colVal" class="val">4</div>
     </div>
 
@@ -400,6 +479,13 @@
       <div class="tlabel">Prefetch prompts</div>
       <div id="pfSwitch" class="switch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
       <div id="pfProg" class="meta" style="display:none">0 / 0</div>
+      <div id="pfEst" class="meta" style="display:none"></div>
+    </div>
+
+    <div class="toggle" title="Scan every image for a dominant color signature">
+      <div class="tlabel">Prefetch colors</div>
+      <div id="pcSwitch" class="switch" role="switch" aria-checked="false" tabindex="0"><div class="knob"></div></div>
+      <div id="pcProg" class="meta" style="display:none">0 / 0</div>
     </div>
 
     <div class="toggle" title="Include images from subfolders when a folder is selected">
@@ -407,10 +493,10 @@
       <div id="recSwitch" class="switch" role="switch" aria-checked="true" tabindex="0"><div class="knob"></div></div>
     </div>
 
-    <button id="dlAllBtn" class="btn" style="display:none">Download selected (zip)</button>
+    <button id="dlAllBtn" class="btn" style="display:none" title="Download selected images as a ZIP archive">Download selected (zip)</button>
 
     <div class="spacer"></div>
-    <button id="helpBtn" class="btn" title="Keyboard shortcuts">?</button>
+    <button id="helpBtn" class="btn" title="Show keyboard shortcuts">?</button>
   </div>
 
   <div class="row" id="row2">
@@ -423,7 +509,7 @@
       <option value="area">Area</option>
       <option value="random">Random</option>
     </select>
-    <button id="sortDir" class="btn" title="Sort direction">↑</button>
+    <button id="sortDir" class="btn" title="Toggle sort direction (asc / desc)">↑</button>
 
     <input id="fnQuery" type="search" placeholder="Filename..." />
 
@@ -441,6 +527,7 @@
     <div id="colorStrip" class="colorStrip"></div>
 
     <div id="folderStrip" class="folderStrip"></div>
+    <div id="depthLegend" class="depthLegend" aria-hidden="true"></div>
 
     <button id="favOnly" class="btn" title="Show favorites only">★ only</button>
     <button id="resetFilters" class="btn" title="Clear all filters">Reset</button>
@@ -455,7 +542,32 @@
   <button id="reopenNo" class="btn">Dismiss</button>
 </div>
 
-<div id="empty">No folder selected.</div>
+<div id="permBanner">
+  <span id="permText">Folder access was revoked. Re-grant to keep browsing.</span>
+  <button id="permRegrant" class="btn">Re-grant</button>
+  <button id="permDismiss" class="btn">Dismiss</button>
+</div>
+
+<div id="walkToast">
+  <span id="walkToastText"></span>
+  <button id="walkToastClose" class="btn">Dismiss</button>
+</div>
+
+<div id="quotaToast">
+  <span id="quotaToastText">Favorites not saved — storage full or unavailable.</span>
+  <button id="quotaToastClose" class="btn">Dismiss</button>
+</div>
+
+<div id="empty">
+  <svg class="emptyArrow" viewBox="0 0 40 40" aria-hidden="true">
+    <path d="M36 32 Q22 30 10 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 12 L8 20 M10 12 L18 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <div class="emptyText">
+    <div class="emptyTitle">Pick a folder to begin.</div>
+    <div class="emptySub">Or drop a folder here.</div>
+  </div>
+</div>
 <div id="grid" aria-live="polite"></div>
 
 <div id="viewer" role="dialog" aria-modal="true" aria-hidden="true">
@@ -465,6 +577,8 @@
 
     <button id="viewerPrev" class="vBtn navBtn" type="button" aria-label="Previous">◀</button>
     <button id="viewerNext" class="vBtn navBtn" type="button" aria-label="Next">▶</button>
+    <button id="slideshowBtn" class="vBtn" type="button" title="Slideshow (S) — Alt-click cycles interval">▶ 3s</button>
+    <button id="filmstripBtn" class="vBtn" type="button" title="Filmstrip (T)">▦</button>
 
     <button id="viewerPrompt" class="vBtn" type="button" title="Show prompt (P)">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px;height:16px">
@@ -482,6 +596,8 @@
 
   <div class="stage" id="viewerStage">
     <canvas id="viewerCanvas"></canvas>
+    <img id="viewerImgOverlay" alt="" />
+    <div id="viewerFilmstrip"></div>
   </div>
 
   <div class="loading">Decoding…</div>
@@ -513,6 +629,16 @@
       <tr><td class="k">C</td><td>copy path</td></tr>
       <tr><td class="k">Esc</td><td>hide panel, then close viewer</td></tr>
       <tr><td class="k">?</td><td>toggle this help</td></tr>
+      <tr><td class="k">+ / -</td><td>zoom in / out</td></tr>
+      <tr><td class="k">0</td><td>fit to window</td></tr>
+      <tr><td class="k">1</td><td>1:1 pixel view</td></tr>
+      <tr><td class="k">R / Shift+R</td><td>rotate 90° cw / ccw</td></tr>
+      <tr><td class="k">S</td><td>toggle slideshow</td></tr>
+      <tr><td class="k">T</td><td>toggle filmstrip</td></tr>
+      <tr><td class="k">Shift+Click</td><td>range select (multiselect)</td></tr>
+      <tr><td class="k">Ctrl+A</td><td>select all in view</td></tr>
+      <tr><td class="k">Ctrl+Shift+A</td><td>clear selection</td></tr>
+      <tr><td class="k">Esc (grid)</td><td>clear selection / exit multiselect</td></tr>
     </table>
   </div>
 </div>
@@ -557,6 +683,23 @@ const recSwitch = document.getElementById('recSwitch');
 const reopenBanner = document.getElementById('reopenBanner');
 const reopenYes = document.getElementById('reopenYes');
 const reopenNo  = document.getElementById('reopenNo');
+const permBanner   = document.getElementById('permBanner');
+const permRegrant  = document.getElementById('permRegrant');
+const permDismiss  = document.getElementById('permDismiss');
+const walkToast      = document.getElementById('walkToast');
+const walkToastText  = document.getElementById('walkToastText');
+const walkToastClose = document.getElementById('walkToastClose');
+const quotaToast      = document.getElementById('quotaToast');
+const quotaToastClose = document.getElementById('quotaToastClose');
+const pcSwitch = document.getElementById('pcSwitch');
+const pcProg   = document.getElementById('pcProg');
+const pfEstEl  = document.getElementById('pfEst');
+let currentRootHandle = null;
+let permissionLost = false;
+let quotaToastShown = false;
+let prefetchColorsActive = false;
+let prefetchColorsDone = 0;
+let prefetchColorsAbort = null;
 
 const viewer      = document.getElementById('viewer');
 const viewerTitle = document.getElementById('viewerTitle');
@@ -572,6 +715,10 @@ const viewerCopy  = document.getElementById('viewerCopy');
 const viewerStage = document.getElementById('viewerStage');
 const viewerCanvas= document.getElementById('viewerCanvas');
 const viewerBadge = document.getElementById('viewerBadge');
+const viewerImgOverlay = document.getElementById('viewerImgOverlay');
+const viewerFilmstrip  = document.getElementById('viewerFilmstrip');
+const slideshowBtn     = document.getElementById('slideshowBtn');
+const filmstripBtn     = document.getElementById('filmstripBtn');
 const shortcutsEl = document.getElementById('shortcuts');
 
 const pcount     = document.getElementById('pcount');
@@ -604,6 +751,7 @@ let showingPromptPanel = false;
 
 let multiselect = false;
 const selected = new Set();
+let lastSelectedK = -1;
 
 let desiredCols = (() => {
   const v = Number(localStorage.getItem('fast_gallery_cols') || "4");
@@ -621,6 +769,7 @@ const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|avif|bmp)$/i;
 const PREVIEW_MAX_PIXELS = 16_000_000;
 const PREVIEW_MAX_DIM = 8192;
 const PREVIEW_OVERSAMPLE = 2;
+const FULLRES_MAX_PIXELS = 96_000_000;
 const PNG_TEXT_MAX_SCAN = 8 * 1024 * 1024;
 const JPEG_META_MAX = 4 * 1024 * 1024;
 
@@ -663,9 +812,14 @@ function idbPut(store, val, key) {
       const tx = db.transaction(store, 'readwrite');
       const r = tx.objectStore(store).put(val, key);
       r.onsuccess = () => resolve(true);
-      r.onerror   = () => resolve(false);
-    } catch (_) { resolve(false); }
-  }));
+      r.onerror   = () => { if (store === STORE_FAVORITES) showQuotaToast(); resolve(false); };
+    } catch (_) { if (store === STORE_FAVORITES) showQuotaToast(); resolve(false); }
+  })).catch(() => { if (store === STORE_FAVORITES) showQuotaToast(); return false; });
+}
+function showQuotaToast() {
+  if (quotaToastShown) return;
+  quotaToastShown = true;
+  quotaToast.style.display = "flex";
 }
 
 // =====================================================================
@@ -673,7 +827,7 @@ function idbPut(store, val, key) {
 // =====================================================================
 function hasFSA() { return 'showDirectoryPicker' in window; }
 
-async function walkDirectoryFSA(dirHandle, onBatch, abortSignal) {
+async function walkDirectoryFSA(dirHandle, onBatch, abortSignal, stats) {
   const BATCH = 200;
   let batch = [];
   const flush = async () => {
@@ -692,15 +846,19 @@ async function walkDirectoryFSA(dirHandle, onBatch, abortSignal) {
         if (child.kind === 'directory') {
           queue.push([child, path]);
         } else if (child.kind === 'file' && IMAGE_EXT_RE.test(name)) {
+          const pLc = path.toLowerCase();
+          const slash = pLc.lastIndexOf("/");
           batch.push({
             name, path, handle: child, file: null,
             ext: extOf(name).slice(1),
             size: undefined, lastModified: undefined,
+            pathLc: pLc,
+            folderLc: slash < 0 ? "" : pLc.slice(0, slash),
           });
           if (batch.length >= BATCH) await flush();
         }
       }
-    } catch (_) {}
+    } catch (_) { if (stats) stats.walkErrors = (stats.walkErrors|0) + 1; }
   }
   await flush();
 }
@@ -729,7 +887,16 @@ async function getFileForEntry(entry) {
     const f = await entry.handle.getFile();
     entry.file = f;
     return f;
-  } catch (err) { throw err; }
+  } catch (err) { onFileAccessError(err); throw err; }
+}
+function onFileAccessError(err) {
+  if (!currentRootHandle) return;
+  if (permissionLost) return;
+  const msg = String(err && (err.name || err.message) || "");
+  if (/NotAllowed|Security|permission/i.test(msg)) {
+    permissionLost = true;
+    permBanner.style.display = "flex";
+  }
 }
 
 async function loadFavoritesFor(key) {
@@ -761,7 +928,22 @@ function depthOf(folder) {
 }
 
 function dlNameForIndex(i) {
-  return `${i + 1}${extOf(files[i].name)}`;
+  const f = files[i];
+  const orig = (f && f.name) ? String(f.name).trim() : "";
+  if (orig) return orig;
+  return `${i + 1}${extOf((f && f.name) || "")}`;
+}
+function zipNameForIndex(i, seenSet) {
+  const base = dlNameForIndex(i);
+  if (!seenSet.has(base)) { seenSet.add(base); return base; }
+  const dot = base.lastIndexOf('.');
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  const ext  = dot > 0 ? base.slice(dot)   : "";
+  let n = 2;
+  let candidate = `${stem}-${n}${ext}`;
+  while (seenSet.has(candidate)) { n++; candidate = `${stem}-${n}${ext}`; }
+  seenSet.add(candidate);
+  return candidate;
 }
 function fmtDims(d) {
   if (!d || d._unknown) return "—";
@@ -1410,13 +1592,13 @@ function buildView() {
   }
   if (filterState.query) {
     const q = filterState.query.toLowerCase();
-    out = out.filter(i => files[i].path.toLowerCase().includes(q));
+    out = out.filter(i => (files[i].pathLc || "").includes(q));
   }
   if (filterState.folders.size > 0) {
     const rec = filterState.recursive;
-    const sels = Array.from(filterState.folders);
+    const sels = Array.from(filterState.folders, s => String(s).toLowerCase());
     out = out.filter(i => {
-      const f = folderOf(files[i].path);
+      const f = files[i].folderLc || "";
       for (const sel of sels) {
         if (rec) { if (f === sel || (sel === "" ? true : f.startsWith(sel + "/"))) return true; }
         else { if (f === sel) return true; }
@@ -1763,12 +1945,53 @@ async function downloadIndex(i) {
 // =====================================================================
 let bmp = null, bmpW = 1, bmpH = 1, isFullRes = false;
 let zoomS = 1, baseScale = 1, panX = 0, panY = 0;
+let viewerRotation = 0;
 const ZMIN = 1, ZMAX = 10;
 let dragging = false, dragStartX = 0, dragStartY = 0, dragStartPanX = 0, dragStartPanY = 0;
 
+let viewerOverlayUrl = "";
+function useImgOverlay(i) {
+  if (!isValidIndex(i)) return false;
+  const f = files[i]; if (!f) return false;
+  const ext = String(f.ext || "").toLowerCase();
+  if (ext === 'gif') return true;
+  if (ext === 'webp') {
+    const size = Number(f.size || 0);
+    return size > 0 && size < 25 * 1024 * 1024;
+  }
+  return false;
+}
+function hideImgOverlay() {
+  viewerImgOverlay.style.display = 'none';
+  viewerImgOverlay.removeAttribute('src');
+  viewerCanvas.style.display = '';
+  if (viewerOverlayUrl) {
+    try { URL.revokeObjectURL(viewerOverlayUrl); } catch (_) {}
+    viewerOverlayUrl = "";
+  }
+}
+function showImgOverlay(file) {
+  try {
+    if (viewerOverlayUrl) {
+      try { URL.revokeObjectURL(viewerOverlayUrl); } catch (_) {}
+      viewerOverlayUrl = "";
+    }
+    viewerOverlayUrl = URL.createObjectURL(file);
+    viewerImgOverlay.src = viewerOverlayUrl;
+    viewerImgOverlay.style.display = 'block';
+    viewerCanvas.style.display = 'none';
+  } catch (_) {}
+}
+
 function setZoomClasses() { viewer.classList.toggle('zoomed', zoomS > 1.0001); viewer.classList.toggle('dragging', dragging); }
 function stageRect() { const r = viewerStage.getBoundingClientRect(); return { w:r.width||1, h:r.height||1, left:r.left, top:r.top }; }
-function computeBaseScale() { const r = stageRect(); return Math.min(r.w / bmpW, r.h / bmpH); }
+function computeBaseScale() {
+  const r = stageRect();
+  const rot = ((viewerRotation % 360) + 360) % 360;
+  const w = (rot === 90 || rot === 270) ? bmpH : bmpW;
+  const h = (rot === 90 || rot === 270) ? bmpW : bmpH;
+  return Math.min(r.w / w, r.h / h);
+}
 function clampPan() {
   if (zoomS <= 1.0001) { panX = 0; panY = 0; return; }
   const r = stageRect(); const s = baseScale * zoomS;
@@ -1794,6 +2017,7 @@ function drawViewer() {
   const s = baseScale * zoomS;
   vctx.save();
   vctx.translate(r.w/2 + panX, r.h/2 + panY);
+  if (viewerRotation) vctx.rotate(viewerRotation * Math.PI / 180);
   vctx.scale(s, s);
   vctx.drawImage(bmp, -bmpW/2, -bmpH/2);
   vctx.restore();
@@ -1892,12 +2116,29 @@ async function startDecode(i, wantFullRes) {
   bmp = null; bmpW = 1; bmpH = 1;
   drawViewer();
   let file;
-  try { file = await getFileForEntry(files[i]); } catch (_) { viewer.classList.remove('loading'); setBadge("Decode failed", true); return; }
+  try { file = await getFileForEntry(files[i]); }
+  catch (err) { viewer.classList.remove('loading'); setBadge("Decode failed", true); onFileAccessError(err); return; }
+
+  let cap = null;
+  if (wantFullRes === true) {
+    const d = dims[i];
+    if (d && d.w > 0 && d.h > 0 && (d.w * d.h) > FULLRES_MAX_PIXELS) {
+      const s = Math.sqrt(FULLRES_MAX_PIXELS / (d.w * d.h));
+      const rw = Math.max(1, Math.floor(d.w * s));
+      const rh = Math.max(1, Math.floor(d.h * s));
+      cap = { rw, rh, sw: d.w, sh: d.h };
+    }
+  }
+
   if (!decodeWorker) {
     try {
       let b;
       const opts = { imageOrientation:"from-image" };
-      if (!wantFullRes && window.createImageBitmap) {
+      if (cap) {
+        try { b = await createImageBitmap(file, { ...opts, resizeWidth:cap.rw, resizeHeight:cap.rh, resizeQuality:"high" }); }
+        catch (_) { b = await createImageBitmap(file, opts); }
+        isFullRes = false;
+      } else if (!wantFullRes && window.createImageBitmap) {
         const pr = computePreviewResize(i);
         try { b = await createImageBitmap(file, { ...opts, resizeWidth:pr.rw, resizeHeight:pr.rh, resizeQuality:"high" }); }
         catch (_) { b = await createImageBitmap(file, opts); }
@@ -1906,34 +2147,50 @@ async function startDecode(i, wantFullRes) {
       if (reqId !== activeReqId) { closeBitmap(b); return; }
       bmp = b; bmpW = b.width; bmpH = b.height;
       const d = dims[i];
-      if (d && d.w > 1 && d.h > 1) isFullRes = (bmpW === d.w && bmpH === d.h);
+      if (d && d.w > 1 && d.h > 1 && !cap) isFullRes = (bmpW === d.w && bmpH === d.h);
       viewer.classList.remove('loading');
       baseScale = computeBaseScale();
       zoomS = 1; panX = 0; panY = 0; dragging = false;
       drawViewer();
       updateViewerButtons(i);
+      if (cap) setBadge(`Capped ${cap.sw}×${cap.sh} → ${bmpW}×${bmpH}`, true);
     } catch (_) { viewer.classList.remove('loading'); setBadge("Decode failed", true); }
     return;
   }
-  const msg = wantFullRes ? { reqId, file, rw:0, rh:0, quality:"high" }
-                          : ((pr) => { isFullRes = !pr.downscaled; return { reqId, file, rw:pr.rw, rh:pr.rh, quality:"high" }; })(computePreviewResize(i));
-  if (wantFullRes) isFullRes = true;
+  let msg;
+  if (cap) {
+    isFullRes = false;
+    msg = { reqId, file, rw:cap.rw, rh:cap.rh, quality:"high" };
+  } else if (wantFullRes) {
+    isFullRes = true;
+    msg = { reqId, file, rw:0, rh:0, quality:"high" };
+  } else {
+    const pr = computePreviewResize(i);
+    isFullRes = !pr.downscaled;
+    msg = { reqId, file, rw:pr.rw, rh:pr.rh, quality:"high" };
+  }
+  decodeWorker._capByReq = decodeWorker._capByReq || new Map();
+  if (cap) decodeWorker._capByReq.set(reqId, cap);
   decodeWorker.postMessage(msg);
 }
 if (decodeWorker) {
   decodeWorker.onmessage = (e) => {
     const { reqId, ok, bmp:b, w, h } = e.data || {};
+    const capMap = decodeWorker._capByReq;
+    const cap = capMap ? capMap.get(reqId) : null;
+    if (capMap) capMap.delete(reqId);
     if (reqId !== activeReqId) { if (ok) closeBitmap(b); return; }
     if (!viewer.classList.contains('open')) { if (ok) closeBitmap(b); return; }
     if (!ok) { viewer.classList.remove('loading'); setBadge("Decode failed", true); return; }
     bmp = b; bmpW = w || b.width || 1; bmpH = h || b.height || 1;
     const d = dims[currentIndex];
-    if (d && d.w > 1 && d.h > 1) isFullRes = (bmpW === d.w && bmpH === d.h);
+    if (d && d.w > 1 && d.h > 1 && !cap) isFullRes = (bmpW === d.w && bmpH === d.h);
     viewer.classList.remove('loading');
     baseScale = computeBaseScale();
     zoomS = 1; panX = 0; panY = 0; dragging = false;
     drawViewer();
     updateViewerButtons(currentIndex);
+    if (cap) setBadge(`Capped ${cap.sw}×${cap.sh} → ${bmpW}×${bmpH}`, true);
   };
 }
 
@@ -2003,11 +2260,107 @@ async function toggleFavForCurrent() {
   renderVisible();
 }
 
+let slideshowTimer = 0;
+let slideshowIntervalMs = 3000;
+const SLIDESHOW_STEPS = [2000, 3000, 5000, 10000];
+function updateSlideshowBtn() {
+  const on = slideshowTimer !== 0;
+  const s = Math.round(slideshowIntervalMs / 1000);
+  slideshowBtn.textContent = `${on ? '⏸' : '▶'} ${s}s`;
+  slideshowBtn.classList.toggle('on', on);
+}
+function stopSlideshow() {
+  if (slideshowTimer) { clearInterval(slideshowTimer); slideshowTimer = 0; }
+  updateSlideshowBtn();
+}
+function startSlideshow() {
+  if (slideshowTimer) clearInterval(slideshowTimer);
+  slideshowTimer = setInterval(() => nextInView(), slideshowIntervalMs);
+  updateSlideshowBtn();
+}
+function toggleSlideshow() { if (slideshowTimer) stopSlideshow(); else startSlideshow(); }
+function cycleSlideshowInterval() {
+  const cur = SLIDESHOW_STEPS.indexOf(slideshowIntervalMs);
+  slideshowIntervalMs = SLIDESHOW_STEPS[(cur + 1) % SLIDESHOW_STEPS.length];
+  if (slideshowTimer) startSlideshow();
+  updateSlideshowBtn();
+}
+function manualNext() { stopSlideshow(); nextInView(); }
+function manualPrev() { stopSlideshow(); prevInView(); }
+
+const filmstripUrls = new Map();
+let filmstripOn = false;
+function revokeAllFilmstripUrls() {
+  for (const u of filmstripUrls.values()) {
+    try { URL.revokeObjectURL(u); } catch (_) {}
+  }
+  filmstripUrls.clear();
+}
+async function ensureFilmstripThumb(globalIdx) {
+  if (filmstripUrls.has(globalIdx)) return filmstripUrls.get(globalIdx);
+  try {
+    const f = await getFileForEntry(files[globalIdx]);
+    const url = URL.createObjectURL(f);
+    filmstripUrls.set(globalIdx, url);
+    return url;
+  } catch (_) { return ""; }
+}
+function renderFilmstrip() {
+  if (!filmstripOn) return;
+  if (!view.length) { viewerFilmstrip.innerHTML = ""; return; }
+  const total = view.length;
+  const center = clamp(currentViewPos, 0, total - 1);
+  const from = Math.max(0, center - 10);
+  const to   = Math.min(total - 1, center + 10);
+  const frag = document.createDocumentFragment();
+  const wanted = new Set();
+  for (let k = from; k <= to; k++) {
+    const gi = view[k];
+    wanted.add(gi);
+    const cell = document.createElement('div');
+    cell.className = 'fcell' + (k === center ? ' active' : '');
+    cell.dataset.pos = String(k);
+    const img = document.createElement('img');
+    img.decoding = 'async';
+    img.loading = 'lazy';
+    img.alt = '';
+    cell.appendChild(img);
+    const cap = document.createElement('span');
+    cap.className = 'fcap';
+    cap.textContent = String(k + 1);
+    cell.appendChild(cap);
+    frag.appendChild(cell);
+    ensureFilmstripThumb(gi).then((u) => { if (u && filmstripOn) img.src = u; });
+  }
+  viewerFilmstrip.innerHTML = "";
+  viewerFilmstrip.appendChild(frag);
+  for (const [gi, u] of Array.from(filmstripUrls.entries())) {
+    if (!wanted.has(gi)) {
+      try { URL.revokeObjectURL(u); } catch (_) {}
+      filmstripUrls.delete(gi);
+    }
+  }
+  const active = viewerFilmstrip.querySelector('.fcell.active');
+  if (active) {
+    const stripW = viewerFilmstrip.clientWidth;
+    viewerFilmstrip.scrollLeft = Math.max(0, active.offsetLeft - stripW / 2 + active.offsetWidth / 2);
+  }
+}
+function toggleFilmstrip(on) {
+  filmstripOn = (typeof on === 'boolean') ? on : !filmstripOn;
+  viewer.classList.toggle('showFilmstrip', filmstripOn);
+  filmstripBtn.classList.toggle('on', filmstripOn);
+  if (filmstripOn) renderFilmstrip();
+  else { revokeAllFilmstripUrls(); viewerFilmstrip.innerHTML = ""; }
+}
+
 async function openViewer(i, viewPos) {
   if (!hasViewerCanvas || !isValidIndex(i)) return;
+  hideImgOverlay();
   currentIndex = i;
   currentViewPos = (typeof viewPos === 'number') ? viewPos : view.indexOf(i);
   if (currentViewPos < 0) currentViewPos = 0;
+  viewerRotation = 0;
 
   try { await ensureDims(i); } catch (_) {}
   const path = files[i].path || files[i].name;
@@ -2021,12 +2374,23 @@ async function openViewer(i, viewPos) {
   isFullRes = false;
   updateViewerButtons(i);
   updateFavButton();
-  startDecode(i, false);
+  if (useImgOverlay(i)) {
+    try {
+      const f = await getFileForEntry(files[i]);
+      if (i === currentIndex) showImgOverlay(f);
+    } catch (_) { startDecode(i, false); }
+  } else {
+    startDecode(i, false);
+  }
   currentPromptIdx = 0;
   showPromptPanel(false);
   loadAndShowPrompts(i, false);
+  if (filmstripOn) renderFilmstrip();
 }
 function closeViewer() {
+  stopSlideshow();
+  if (filmstripOn) toggleFilmstrip(false);
+  hideImgOverlay();
   viewer.classList.remove('open','loading','showPrompt');
   viewer.setAttribute('aria-hidden', 'true');
   activeReqId = ++decodeReqId;
@@ -2063,8 +2427,28 @@ viewerPrompt.addEventListener('click', () => {
   if (!list.length) return;
   showPromptPanel(!showingPromptPanel);
 });
-viewerPrev.addEventListener('click', prevInView);
-viewerNext.addEventListener('click', nextInView);
+viewerPrev.addEventListener('click', manualPrev);
+viewerNext.addEventListener('click', manualNext);
+slideshowBtn.addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  if (e.altKey) { cycleSlideshowInterval(); return; }
+  toggleSlideshow();
+});
+filmstripBtn.addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  toggleFilmstrip();
+});
+viewerFilmstrip.addEventListener('click', (e) => {
+  const cell = e.target.closest('.fcell');
+  if (!cell) return;
+  e.preventDefault(); e.stopPropagation();
+  const p = Number(cell.dataset.pos);
+  if (Number.isFinite(p) && view[p] != null) {
+    stopSlideshow();
+    openViewer(view[p], p);
+  }
+});
+updateSlideshowBtn();
 viewerFav.addEventListener('click', toggleFavForCurrent);
 viewerCopy.addEventListener('click', async () => {
   if (!isValidIndex(currentIndex)) return;
@@ -2119,8 +2503,45 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if (!viewer.classList.contains('open')) return;
+  // Grid-mode shortcuts (viewer closed)
+  if (!viewer.classList.contains('open')) {
+    const tgt = e.target;
+    const tag = tgt && tgt.tagName ? tgt.tagName : "";
+    const editable = tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (tgt && tgt.isContentEditable);
+    if (editable) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault();
+      if (e.shiftKey) {
+        selected.clear();
+        renderVisible();
+        updateSelectionUI();
+      } else {
+        if (!multiselect) setMultiselect(true);
+        for (const idx of view) selected.add(idx);
+        renderVisible();
+        updateSelectionUI();
+      }
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (shortcutsEl.style.display === 'block') { shortcutsEl.style.display = 'none'; return; }
+      if (multiselect && selected.size > 0) {
+        selected.clear();
+        lastSelectedK = -1;
+        renderVisible();
+        updateSelectionUI();
+      } else if (multiselect) {
+        setMultiselect(false);
+        lastSelectedK = -1;
+      }
+      return;
+    }
+    return;
+  }
+  // Viewer-open shortcuts
   if (e.key === 'Escape') {
+    if (slideshowTimer) { stopSlideshow(); return; }
     if (shortcutsEl.style.display === 'block') { shortcutsEl.style.display = 'none'; return; }
     if (showingPromptPanel) { showPromptPanel(false); return; }
     closeViewer(); return;
@@ -2128,13 +2549,41 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'p' || e.key === 'P') { viewerPrompt.click(); return; }
   if (e.key === 'f' || e.key === 'F') { toggleFavForCurrent(); return; }
   if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) { viewerCopy.click(); return; }
+  if (e.key === 's' || e.key === 'S') { toggleSlideshow(); e.preventDefault(); return; }
+  if (e.key === 't' || e.key === 'T') { toggleFilmstrip(); e.preventDefault(); return; }
+  if (e.key === '+' || e.key === '=') {
+    const r = stageRect();
+    zoomAt(r.left + r.w / 2, r.top + r.h / 2, 1.25);
+    e.preventDefault(); return;
+  }
+  if (e.key === '-' || e.key === '_') {
+    const r = stageRect();
+    zoomAt(r.left + r.w / 2, r.top + r.h / 2, 1 / 1.25);
+    e.preventDefault(); return;
+  }
+  if (e.key === '0') {
+    zoomS = 1; panX = 0; panY = 0; drawViewer();
+    e.preventDefault(); return;
+  }
+  if (e.key === '1') {
+    if (baseScale > 0) { zoomS = clamp(1 / baseScale, ZMIN, ZMAX); panX = 0; panY = 0; drawViewer(); }
+    e.preventDefault(); return;
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    const delta = e.shiftKey ? -90 : 90;
+    viewerRotation = (((viewerRotation + delta) % 360) + 360) % 360;
+    baseScale = computeBaseScale();
+    zoomS = 1; panX = 0; panY = 0;
+    drawViewer();
+    e.preventDefault(); return;
+  }
   if (e.key === 'ArrowLeft') {
     if (showingPromptPanel) { pPrev.click(); e.preventDefault(); return; }
-    prevInView(); e.preventDefault(); return;
+    manualPrev(); e.preventDefault(); return;
   }
   if (e.key === 'ArrowRight') {
     if (showingPromptPanel) { pNext.click(); e.preventDefault(); return; }
-    nextInView(); e.preventDefault(); return;
+    manualNext(); e.preventDefault(); return;
   }
 });
 helpBtn.addEventListener('click', () => {
@@ -2173,7 +2622,21 @@ grid.addEventListener('click', (ev) => {
   if (!isValidIndex(i)) return;
   if (multiselect) {
     ev.preventDefault(); ev.stopPropagation();
-    toggleSelectionIndex(i);
+    const k = view.indexOf(i);
+    if (ev.shiftKey && lastSelectedK >= 0 && k >= 0) {
+      const lo = Math.min(lastSelectedK, k);
+      const hi = Math.max(lastSelectedK, k);
+      for (let j = lo; j <= hi; j++) {
+        const idx = view[j];
+        if (isValidIndex(idx)) selected.add(idx);
+      }
+      lastSelectedK = k;
+      renderVisible();
+      updateSelectionUI();
+    } else {
+      toggleSelectionIndex(i);
+      if (k >= 0) lastSelectedK = k;
+    }
     return;
   }
   const selBox = ev.target.closest('.sel');
@@ -2236,7 +2699,9 @@ favOnlyBtn.addEventListener('click', () => {
   favOnlyBtn.classList.toggle('on', filterState.favoritesOnly);
   saveFilterState(); applyFilters();
 });
-resetFiltersBtn.addEventListener('click', () => {
+let resetArmedUntil = 0;
+let resetRevertT = 0;
+function doResetFilters() {
   filterState.query = ""; fnQuery.value = "";
   filterState.keyword = ""; kwQuery.value = "";
   filterState.orientation = "all"; oriSel.value = "all";
@@ -2246,6 +2711,26 @@ resetFiltersBtn.addEventListener('click', () => {
   filterState.folders.clear(); renderFolderStrip();
   filterState.recursive = true; syncRecSwitch();
   saveFilterState(); applyFilters();
+}
+function revertResetLabel() {
+  resetFiltersBtn.textContent = "Reset";
+  resetFiltersBtn.classList.remove('armed');
+  resetArmedUntil = 0;
+  clearTimeout(resetRevertT);
+  resetRevertT = 0;
+}
+resetFiltersBtn.addEventListener('click', () => {
+  const now = performance.now();
+  if (resetArmedUntil && now < resetArmedUntil) {
+    revertResetLabel();
+    doResetFilters();
+    return;
+  }
+  resetArmedUntil = now + 3000;
+  resetFiltersBtn.textContent = "Sure?";
+  resetFiltersBtn.classList.add('armed');
+  clearTimeout(resetRevertT);
+  resetRevertT = setTimeout(revertResetLabel, 3000);
 });
 
 function refreshFormatChips() {
@@ -2319,6 +2804,42 @@ function renderFolderStrip() {
     });
     folderStripEl.appendChild(btn);
   }
+  renderDepthLegend();
+}
+
+const DEPTH_TINTS = [
+  null,
+  "hsl( 47, 45%, 28%)",
+  "hsl( 94, 45%, 28%)",
+  "hsl(141, 45%, 28%)",
+  "hsl(188, 45%, 28%)",
+  "hsl(235, 45%, 32%)",
+  "hsl(282, 45%, 30%)",
+  "hsl(329, 45%, 30%)",
+  "hsl( 16, 45%, 30%)",
+];
+const depthLegendEl = document.getElementById('depthLegend');
+function renderDepthLegend() {
+  while (depthLegendEl.firstChild) depthLegendEl.removeChild(depthLegendEl.firstChild);
+  if (!files.length) return;
+  const byDepth = new Map();
+  for (const f of files) {
+    const folder = folderOf(f.path);
+    const d = depthOf(folder);
+    if (d < 1) continue;
+    if (!byDepth.has(d)) byDepth.set(d, folder);
+  }
+  const depths = Array.from(byDepth.keys()).sort((a, b) => a - b);
+  for (const d of depths) {
+    const band = document.createElement('div');
+    band.className = 'dband';
+    const tint = DEPTH_TINTS[Math.min(d, DEPTH_TINTS.length - 1)] || "var(--stroke)";
+    band.style.background = tint;
+    const sample = byDepth.get(d);
+    const leaf = sample.split('/').pop() || sample;
+    band.title = `Depth ${d} (${leaf})`;
+    depthLegendEl.appendChild(band);
+  }
 }
 
 function syncRecSwitch() {
@@ -2380,14 +2901,105 @@ async function startPrefetchPrompts() {
   await Promise.all(workers);
   if (!token.aborted) { updatePrefetchUI(); renderVisible(); }
 }
+async function estimatePrefetchSize() {
+  const n = files.length;
+  if (!n) return null;
+  const sampleN = Math.min(20, n);
+  const step = Math.max(1, Math.floor(n / sampleN));
+  const picks = [];
+  for (let i = 0; i < n && picks.length < sampleN; i += step) picks.push(i);
+  let totalSampled = 0, counted = 0;
+  for (const i of picks) {
+    try {
+      const f = await getFileForEntry(files[i]);
+      if (f && Number.isFinite(f.size)) { totalSampled += f.size; counted++; }
+    } catch (_) {}
+  }
+  if (!counted) return null;
+  const avg = totalSampled / counted;
+  const estMB = Math.round((avg * n) / (1024 * 1024));
+  return { files: n, estMB };
+}
+
 function flipPf() {
   prefetchActive = !prefetchActive;
   updatePrefetchUI();
-  if (prefetchActive && files.length) startPrefetchPrompts();
-  else if (prefetchAbort) { prefetchAbort.aborted = true; prefetchAbort = null; }
+  if (prefetchActive && files.length) {
+    if (files.length > 1000) {
+      pfEstEl.style.display = "block";
+      pfEstEl.textContent = "estimating...";
+      estimatePrefetchSize().then((est) => {
+        if (!prefetchActive || !est) { pfEstEl.style.display = "none"; return; }
+        pfEstEl.textContent = `~${est.files} files · ~${est.estMB} MB`;
+      });
+    } else {
+      pfEstEl.style.display = "none";
+      pfEstEl.textContent = "";
+    }
+    startPrefetchPrompts();
+  } else {
+    pfEstEl.style.display = "none";
+    pfEstEl.textContent = "";
+    if (prefetchAbort) { prefetchAbort.aborted = true; prefetchAbort = null; }
+  }
 }
 pfSwitch.addEventListener('click', flipPf);
 pfSwitch.addEventListener('keydown', e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flipPf(); } });
+
+function updatePrefetchColorsUI() {
+  pcSwitch.classList.toggle('on', prefetchColorsActive);
+  pcSwitch.setAttribute('aria-checked', prefetchColorsActive ? "true" : "false");
+  if (!prefetchColorsActive || !files.length) { pcProg.style.display = "none"; return; }
+  pcProg.style.display = "block";
+  pcProg.textContent = `${prefetchColorsDone} / ${files.length}`;
+}
+async function startPrefetchColors() {
+  if (prefetchColorsAbort) prefetchColorsAbort.aborted = true;
+  const token = { aborted:false };
+  prefetchColorsAbort = token;
+  prefetchColorsDone = 0;
+  updatePrefetchColorsUI();
+  const CONC = 4;
+  let idx = 0;
+  const total = files.length;
+  const workers = new Array(Math.min(CONC, total)).fill(0).map(async () => {
+    while (idx < total) {
+      const cur = idx++;
+      if (token.aborted) return;
+      if (!colors[cur]) {
+        try {
+          const f = await getFileForEntry(files[cur]);
+          const bmp = await createImageBitmap(f, { resizeWidth:32, resizeHeight:32, resizeQuality:"low" });
+          try {
+            const sig = computeColorSignature(bmp);
+            if (sig) colors[cur] = sig;
+          } finally { try { bmp.close(); } catch (_) {} }
+        } catch (_) {}
+      }
+      prefetchColorsDone++;
+      if ((prefetchColorsDone & 15) === 0 || prefetchColorsDone === total) updatePrefetchColorsUI();
+    }
+  });
+  await Promise.all(workers);
+  if (!token.aborted) { updatePrefetchColorsUI(); applyFilters(); }
+}
+function flipPc() {
+  prefetchColorsActive = !prefetchColorsActive;
+  updatePrefetchColorsUI();
+  if (prefetchColorsActive && files.length) startPrefetchColors();
+  else if (prefetchColorsAbort) { prefetchColorsAbort.aborted = true; prefetchColorsAbort = null; }
+}
+pcSwitch.addEventListener('click', flipPc);
+pcSwitch.addEventListener('keydown', e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flipPc(); } });
+
+permRegrant.addEventListener('click', async () => {
+  if (!currentRootHandle) { permBanner.style.display = "none"; return; }
+  const ok = await requestReadPermission(currentRootHandle);
+  if (ok) { permissionLost = false; permBanner.style.display = "none"; applyFilters(); }
+});
+permDismiss.addEventListener('click', () => { permBanner.style.display = "none"; });
+walkToastClose.addEventListener('click', () => { walkToast.style.display = "none"; });
+quotaToastClose.addEventListener('click', () => { quotaToast.style.display = "none"; });
 
 // =====================================================================
 // ZIP
@@ -2442,13 +3054,71 @@ async function buildZip(indices) {
   const eocd = [u32(0x06054b50),u16(0),u16(0),u16(indices.length),u16(indices.length),u32(centralSize),u32(centralStart),u16(0)];
   return new Blob([...localParts, ...centralParts, ...eocd], { type:"application/zip" });
 }
-dlAllBtn.addEventListener('click', async () => {
+async function buildAndSaveZipStreaming(indices) {
+  indices = (indices || []).filter(isValidIndex).sort((a,b) => a-b);
+  if (!indices.length) throw new Error("No valid files selected");
+  const MAX = 2 * 1024 * 1024 * 1024;
+  let total = 0;
+  for (const i of indices) { const f = await getFileForEntry(files[i]); total += f.size; }
+  if (total > MAX) throw new Error(`Selection too large (${Math.round(total/1024/1024)} MB).`);
+  let fileHandle;
+  try {
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName: 'selected_images.zip',
+      types: [{ description:'ZIP', accept:{ 'application/zip':['.zip'] } }],
+    });
+  } catch (_) { return false; }
+  const writable = await fileHandle.createWritable();
+  const enc = new TextEncoder();
+  const { time, date } = dosDateTime(new Date());
+  const centralParts = [];
+  let offset = 0;
+  const nameSeen = new Set();
+  try {
+    for (const i of indices) {
+      let f = await getFileForEntry(files[i]);
+      const name = zipNameForIndex(i, nameSeen);
+      const nameBytes = enc.encode(name);
+      const ab = await f.arrayBuffer();
+      let data = new Uint8Array(ab);
+      const crc = crc32(data);
+      const size = data.byteLength;
+      const local = [u32(0x04034b50),u16(20),u16(0),u16(0),u16(time),u16(date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),nameBytes];
+      const localLen = local.reduce((s,p) => s + p.length, 0);
+      for (const part of local) await writable.write(part);
+      await writable.write(data);
+      const central = [u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(time),u16(date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),nameBytes];
+      centralParts.push(...central);
+      offset += localLen + data.length;
+      data = null; f = null;
+      await Promise.resolve();
+    }
+    const centralStart = offset;
+    const centralSize = centralParts.reduce((s,p) => s + p.length, 0);
+    for (const part of centralParts) await writable.write(part);
+    const eocd = [u32(0x06054b50),u16(0),u16(0),u16(indices.length),u16(indices.length),u32(centralSize),u32(centralStart),u16(0)];
+    for (const part of eocd) await writable.write(part);
+    await writable.close();
+    return true;
+  } catch (err) {
+    try { await writable.abort(); } catch (_) {}
+    throw err;
+  }
+}
+
+async function downloadSelectedZip() {
   const indices = Array.from(selected).sort((a,b) => a-b);
   if (!indices.length) return;
   dlAllBtn.disabled = true;
   const old = dlAllBtn.textContent;
   dlAllBtn.textContent = "Zipping...";
   try {
+    if ('showSaveFilePicker' in window) {
+      try {
+        const ok = await buildAndSaveZipStreaming(indices);
+        if (ok) return;
+      } catch (err) { alert(err?.message || "Failed to build ZIP"); return; }
+    }
     const zipBlob = await buildZip(indices);
     const url = URL.createObjectURL(zipBlob);
     const a = document.createElement('a');
@@ -2457,13 +3127,15 @@ dlAllBtn.addEventListener('click', async () => {
     setTimeout(() => URL.revokeObjectURL(url), 12000);
   } catch (err) { alert(err?.message || "Failed to build ZIP"); }
   finally { dlAllBtn.disabled = false; dlAllBtn.textContent = old; }
-});
+}
+dlAllBtn.addEventListener('click', downloadSelectedZip);
 
 // =====================================================================
 // Load pipeline
 // =====================================================================
 async function resetAndLoadFiles(entries, key) {
   if (prefetchAbort) { prefetchAbort.aborted = true; prefetchAbort = null; }
+  if (prefetchColorsAbort) { prefetchColorsAbort.aborted = true; prefetchColorsAbort = null; }
   files = entries;
   dims = new Array(files.length);
   dimsP = new Array(files.length);
@@ -2471,6 +3143,7 @@ async function resetAndLoadFiles(entries, key) {
   promptsP = new Array(files.length);
   colors = new Array(files.length);
   selected.clear();
+  lastSelectedK = -1;
   rootKey = key || "";
   favorites = await loadFavoritesFor(rootKey);
 
@@ -2481,12 +3154,14 @@ async function resetAndLoadFiles(entries, key) {
   renderFolderStrip();
   updateSelectionUI();
   updatePrefetchUI();
+  updatePrefetchColorsUI();
 
   await ensureFirstDims(400);
 
   applyFilters();
 
   if (prefetchActive && files.length) startPrefetchPrompts();
+  if (prefetchColorsActive && files.length) startPrefetchColors();
 }
 
 async function ensureFirstDims(n) {
@@ -2507,13 +3182,22 @@ async function ensureRestDimsInBackground(startFrom) {
 }
 
 async function loadViaFSA(dirHandle) {
+  currentRootHandle = dirHandle;
+  permissionLost = false;
+  permBanner.style.display = "none";
   const collected = [];
+  const stats = { walkErrors: 0 };
   await walkDirectoryFSA(dirHandle, (batch) => {
     for (const e of batch) collected.push(e);
-    if (collected.length && collected.length - files.length > 200) {}
-  });
+  }, undefined, stats);
   collected.sort((a,b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
   await resetAndLoadFiles(collected, "fsa:" + (dirHandle.name || "root"));
+  if (stats.walkErrors > 0) {
+    walkToastText.textContent = `Skipped ${stats.walkErrors} folder${stats.walkErrors === 1 ? "" : "s"} (permission or read error)`;
+    walkToast.style.display = "flex";
+  } else {
+    walkToast.style.display = "none";
+  }
 }
 
 async function loadViaWebkitDirectory(fileList) {
@@ -2523,15 +3207,22 @@ async function loadViaWebkitDirectory(fileList) {
     const pb = (b.webkitRelativePath || b.name).toLowerCase();
     return pa < pb ? -1 : pa > pb ? 1 : 0;
   });
-  const entries = list.map(f => ({
-    name: f.name,
-    path: f.webkitRelativePath || f.name,
-    handle: null,
-    file: f,
-    ext: extOf(f.name).slice(1),
-    size: f.size,
-    lastModified: f.lastModified,
-  }));
+  const entries = list.map(f => {
+    const path = f.webkitRelativePath || f.name;
+    const pLc  = path.toLowerCase();
+    const slash = pLc.lastIndexOf("/");
+    return {
+      name: f.name,
+      path,
+      handle: null,
+      file: f,
+      ext: extOf(f.name).slice(1),
+      size: f.size,
+      lastModified: f.lastModified,
+      pathLc: pLc,
+      folderLc: slash < 0 ? "" : pLc.slice(0, slash),
+    };
+  });
   const rootName = entries.length ? (entries[0].path.split("/")[0] || "") : "";
   await resetAndLoadFiles(entries, "webkit:" + rootName);
 }
@@ -2552,7 +3243,67 @@ async function pickFolder() {
 pickBtn.addEventListener('click', pickFolder);
 dirInput.addEventListener('change', async () => {
   reopenBanner.style.display = "none";
+  currentRootHandle = null;
   await loadViaWebkitDirectory(dirInput.files);
+});
+
+async function walkDropEntry(entry, prefix) {
+  const out = [];
+  if (!entry) return out;
+  if (entry.isFile) {
+    if (!isImage(entry.name)) return out;
+    const file = await new Promise((res, rej) => entry.file(res, rej));
+    const path = prefix ? prefix + "/" + entry.name : entry.name;
+    const pLc = path.toLowerCase();
+    const slash = pLc.lastIndexOf("/");
+    out.push({
+      name: entry.name, path, handle: null, file,
+      ext: extOf(entry.name).slice(1),
+      size: file.size, lastModified: file.lastModified,
+      pathLc: pLc,
+      folderLc: slash < 0 ? "" : pLc.slice(0, slash),
+    });
+    return out;
+  }
+  if (entry.isDirectory) {
+    const reader = entry.createReader();
+    const nextPrefix = prefix ? prefix + "/" + entry.name : entry.name;
+    while (true) {
+      const chunk = await new Promise((res, rej) => reader.readEntries(res, rej));
+      if (!chunk.length) break;
+      for (const child of chunk) {
+        const sub = await walkDropEntry(child, nextPrefix);
+        for (const e of sub) out.push(e);
+      }
+    }
+  }
+  return out;
+}
+document.body.addEventListener('dragover', (e) => {
+  if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+  e.preventDefault();
+  document.body.classList.add('dropping');
+});
+document.documentElement.addEventListener('dragleave', (e) => {
+  if (e.target === document.documentElement || e.relatedTarget === null) {
+    document.body.classList.remove('dropping');
+  }
+});
+document.body.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  document.body.classList.remove('dropping');
+  const items = e.dataTransfer?.items;
+  if (!items || !items.length) return;
+  const first = items[0];
+  const entry = first.webkitGetAsEntry ? first.webkitGetAsEntry() : null;
+  if (!entry) return;
+  const rootName = entry.name || "drop";
+  const collected = await walkDropEntry(entry, "");
+  collected.sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
+  if (!collected.length) return;
+  reopenBanner.style.display = "none";
+  currentRootHandle = null;
+  await resetAndLoadFiles(collected, "drop:" + rootName);
 });
 
 // Restore last folder banner
@@ -2578,6 +3329,8 @@ dirInput.addEventListener('change', async () => {
 // =====================================================================
 setMultiselect(false);
 updatePrefetchUI();
+updatePrefetchColorsUI();
+updateSlideshowBtn();
 requestAnimationFrame(() => { syncBarHeight(); drawViewer(); });
 
 window.addEventListener('beforeunload', () => {
