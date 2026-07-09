@@ -1,6 +1,11 @@
 # Fast Gallery
 
-Single-file, zero-dependency local image browser. Open an HTML file, point at a folder, get a fast masonry gallery with a canvas viewer, hierarchical folder navigation, prompt extraction, delete, and drag-and-drop.
+Local image browser. Two flavors from one codebase:
+
+- **`fast-gallery.html`** — single-file HTML. Open in any modern browser, point at a folder, done. No install.
+- **Fast Gallery desktop** (Windows) — Tauri 2 wrapper around the same HTML. Native filesystem I/O, Rust-side thumbnails, file associations, tray + global shortcut, single-instance argv forwarding for real double-click-image → viewer flow.
+
+Fast masonry gallery, canvas viewer, hierarchical folder navigation, prompt extraction (A1111 / ComfyUI / Fooocus `log.html` sidecars), delete, drag-and-drop.
 
 ## Features
 
@@ -39,6 +44,47 @@ python -m http.server 8000
 
 Then open `http://localhost:8000/fast-gallery.html`.
 
+## Desktop app (Windows)
+
+Tauri 2 wrapper that eliminates browser sandbox friction. `desktop/` in the repo.
+
+### Extras vs. the plain HTML
+
+- Native folder picker — no FSA permission prompt.
+- Rust thumbnail service: downscaled JPEG thumbs with on-disk cache. Scroll a 30k-image folder smoothly, no `blob` OOM.
+- Header-only dimension probe, header-only metadata read (2 MB slice). Prompt prefetch never ships pixels.
+- `createImageBitmap` fallback for very large images (`12k × 26k`, etc.): Rust decodes to a 2048px preview when Chromium refuses.
+- Real absolute paths in `Copy path` / `Copy folder path`.
+- System tray, close-to-tray. Global shortcut `Ctrl+Alt+G` to toggle window.
+- Windows file association: `Open with Fast Gallery` on `.png/.jpg/.jpeg/.webp/.gif/.bmp/.avif` (Settings → Default apps → pick Fast Gallery to promote to default).
+- Single-instance forwarding: double-clicking a second image while the app is running jumps that window to the new file.
+- Dynamic tab title reflecting state (working, scanning, viewing, browsing).
+
+### Build
+
+Prereqs: Rust stable (MSVC toolchain), Node 20+, Windows 10/11 with WebView2 runtime (present on Windows 11 by default).
+
+```
+cd desktop
+npm install
+npm run tauri build
+```
+
+Output:
+
+- `desktop/src-tauri/target/release/fast-gallery.exe` — portable binary (~11 MB).
+- `desktop/src-tauri/target/release/bundle/nsis/*.exe` — NSIS installer.
+
+Dev cycle: `npm run tauri dev`.
+
+### Install from source
+
+1. Run `npm run tauri build`.
+2. Copy `fast-gallery.exe` anywhere on disk.
+3. First launch → tray menu → **Register file associations** (writes HKCU only, no admin). Fast Gallery now shows up in Settings → Apps → Default apps.
+
+Uninstall the associations from the tray menu.
+
 ### Shortcuts
 
 **Viewer**
@@ -46,6 +92,9 @@ Then open `http://localhost:8000/fast-gallery.html`.
 | key | action |
 |-----|--------|
 | `←` / `→` | Previous / next image |
+| `Shift+←` / `Shift+→` | Cycle prompts (when panel open) |
+| `X` | Open a random image |
+| `Shift+X` | Toggle shuffle slideshow |
 | `P` | Prompt panel |
 | `F` | Favorite |
 | `C` | Copy image path |
@@ -65,6 +114,8 @@ Then open `http://localhost:8000/fast-gallery.html`.
 | `Ctrl+A` | Select all in view |
 | `Ctrl+Shift+A` | Clear selection |
 | `Shift+Click` | Range select |
+| `X` | Open a random image |
+| `Shift+X` | Toggle shuffle slideshow |
 | `Del` | Delete selection |
 | `Esc` | Clear selection / exit select mode |
 | `?` | Toggle shortcut help |
