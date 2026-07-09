@@ -94,10 +94,12 @@
     color:var(--signal-fg);
   }
   .btn.danger, #viewer button.vBtn.danger{
-    color:var(--danger-fg); border-color:var(--rule-strong);
+    color:var(--danger-fg);
+    background:var(--danger-wash);
+    border-color:var(--danger);
   }
   .btn.danger:hover, #viewer button.vBtn.danger:hover{
-    background:var(--danger-wash); border-color:var(--danger); color:#fff;
+    background:var(--danger); border-color:var(--danger); color:#fff;
   }
 
   /* Primary = pickBtn only */
@@ -329,6 +331,46 @@
   .thumb{
     width:100%; height:100%; display:block;
     object-fit:cover; background:#050505;
+  }
+  /* Broken-image icon suppression — Chromium shows a placeholder glyph on
+     empty/failed src. Force zero-glyph via transparent alt + no border. */
+  .thumb:not([src]), .thumb[src=""]{
+    visibility:hidden;
+  }
+  /* Loading + error placeholder on the tile itself */
+  .tile::after{
+    content:"LOADING";
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font:600 10px/1 var(--font-mono);
+    letter-spacing:.18em;
+    color:rgba(255,255,255,.28);
+    background:
+      linear-gradient(90deg, transparent 0%, rgba(255,255,255,.04) 50%, transparent 100%)
+      #0a0a0a;
+    background-size:200% 100%;
+    animation:tileShimmer 1.6s linear infinite;
+    pointer-events:none;
+    z-index:0;
+  }
+  @keyframes tileShimmer{
+    0%{background-position:200% 0}
+    100%{background-position:-200% 0}
+  }
+  .tile.loaded::after, .tile.errored::after{ display:none; }
+  .tile.errored .thumb{ display:none; }
+  .tile.errored::before{
+    content:"DECODE FAILED";
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font:600 9px/1 var(--font-mono);
+    letter-spacing:.16em;
+    color:var(--danger-fg);
+    background:#0a0a0a;
+    pointer-events:none;
+    z-index:1;
+    text-align:center;
+    padding:0 8px;
   }
 
   /* Index stamp — top-left, mono, no chip */
@@ -602,27 +644,40 @@
   #viewer.open{display:block}
   #viewer .top{
     position:absolute; left:0; right:0; top:0;
-    display:flex; gap:6px; align-items:center;
+    display:flex; gap:10px; align-items:center;
     padding:10px 14px;
     background:rgba(10,10,10,.88);
     border-bottom:1px solid var(--rule);
     backdrop-filter:blur(10px); z-index:2;
   }
+  #viewer .topLeft{
+    flex:1 1 0; min-width:0;
+    display:flex; gap:10px; align-items:center;
+  }
+  #viewer .topActions{
+    flex:0 0 auto;
+    display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+  #viewer .vGroup{
+    display:inline-flex; gap:2px; align-items:center;
+    padding:2px; border:1px solid var(--rule); border-radius:0;
+    background:rgba(255,255,255,.02);
+  }
   #viewer .title{
     color:var(--fg); font:13px/1 var(--font-mono);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    max-width:40vw;
+    flex:1 1 0; min-width:0;
   }
   #viewer .vdims{
     height:var(--tap); display:inline-flex; align-items:center;
-    padding:0 10px;
+    padding:0 10px; flex:0 0 auto;
     font:12px/1 var(--font-mono);
     color:var(--fg-dim);
     background:transparent;
     border:1px solid var(--rule);
     white-space:nowrap; user-select:none;
   }
-  #viewer .close{margin-left:auto}
   #viewer .navBtn{padding:0 10px; font-size:14px}
   #viewer .stage{
     position:absolute; inset:52px 0 0;
@@ -650,6 +705,7 @@
     padding:4px 8px; z-index:3;
   }
   #viewer.showFilmstrip #viewerFilmstrip{ display:block; }
+  #viewer.showFilmstrip.showPrompt #viewerFilmstrip{ bottom:var(--promptH, 45vh); }
   #viewerFilmstrip .fcell{
     display:inline-block; width:64px; height:80px;
     margin-right:4px; border-radius:0; overflow:hidden;
@@ -766,7 +822,7 @@
 
     <div class="ctrl" title="Column count">
       <label for="colSlider">Cols</label>
-      <input id="colSlider" type="range" min="1" max="8" step="1" value="4" />
+      <input id="colSlider" type="range" min="1" max="12" step="1" value="4" />
       <div id="colVal" class="val">4</div>
     </div>
 
@@ -821,6 +877,12 @@
       <option value="square">Square</option>
     </select>
 
+    <select id="promptFilter" title="Filter by prompt metadata">
+      <option value="all">Any prompt</option>
+      <option value="has">Has prompt</option>
+      <option value="none">No prompt</option>
+    </select>
+
     <div id="fmtWrap" class="fmtWrap"></div>
 
     <div id="colorStrip" class="colorStrip"></div>
@@ -832,6 +894,7 @@
 
     <div class="spacer"></div>
 
+    <button id="randomOpenBtn" class="btn" title="Open a random image (X)">🎲 Random</button>
     <button id="favOnly" class="btn" title="Show favorites only">★ Favorites</button>
     <button id="resetFilters" class="btn" title="Clear all filters">Reset</button>
   </div>
@@ -914,28 +977,38 @@
 
 <div id="viewer" role="dialog" aria-modal="true" aria-hidden="true">
   <div class="top">
-    <div id="viewerTitle" class="title"></div>
-    <div id="viewerDims" class="vdims"></div>
-
-    <button id="viewerPrev" class="vBtn navBtn" type="button" aria-label="Previous">◀</button>
-    <button id="viewerNext" class="vBtn navBtn" type="button" aria-label="Next">▶</button>
-    <button id="slideshowBtn" class="vBtn" type="button" title="Slideshow (S) — Alt-click cycles interval">▶ 3s</button>
-    <button id="filmstripBtn" class="vBtn" type="button" title="Filmstrip (T)">▦</button>
-
-    <button id="viewerPrompt" class="vBtn" type="button" title="Show prompt (P)">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px;height:16px">
-        <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      Prompt
-    </button>
-
-    <button id="viewerFav" class="vBtn" type="button" title="Favorite (F)">☆</button>
-    <button id="viewerCopy" class="vBtn" type="button" title="Copy path (C)">Copy</button>
-    <button id="viewerFolder" class="vBtn" type="button" title="Copy folder path (Shift+C)">Folder</button>
-    <button id="viewerDl" class="vBtn" type="button" title="Download original">Download</button>
-    <button id="viewerFull" class="vBtn" type="button" title="Full resolution">Full-res</button>
-    <button id="viewerDel" class="vBtn danger" type="button" title="Delete (Del)">Delete</button>
-    <button id="viewerClose" class="vBtn close" type="button">Close</button>
+    <div class="topLeft">
+      <div id="viewerTitle" class="title"></div>
+      <div id="viewerDims" class="vdims"></div>
+    </div>
+    <div class="topActions">
+      <div class="vGroup">
+        <button id="viewerPrev" class="vBtn navBtn" type="button" aria-label="Previous">◀</button>
+        <button id="viewerNext" class="vBtn navBtn" type="button" aria-label="Next">▶</button>
+        <button id="viewerRandom" class="vBtn" type="button" title="Random image (X)">🎲</button>
+        <button id="slideshowBtn" class="vBtn" type="button" title="Slideshow (S) — Alt-click cycles interval">▶ 3s</button>
+        <button id="shuffleBtn" class="vBtn" type="button" title="Shuffle slideshow (Shift+X)">⇄</button>
+        <button id="filmstripBtn" class="vBtn" type="button" title="Filmstrip (T)">▦</button>
+      </div>
+      <div class="vGroup">
+        <button id="viewerPrompt" class="vBtn" type="button" title="Show prompt (P)">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:16px;height:16px">
+            <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Prompt
+        </button>
+        <button id="viewerFav" class="vBtn" type="button" title="Favorite (F)">☆</button>
+        <button id="viewerCopy" class="vBtn" type="button" title="Copy path (C)">Copy</button>
+        <button id="viewerFolder" class="vBtn" type="button" title="Copy folder path (Shift+C)">Folder</button>
+        <button id="viewerDl" class="vBtn" type="button" title="Download original">Download</button>
+        <button id="viewerFull" class="vBtn" type="button" title="Full resolution">Full-res</button>
+        <button id="viewerDel" class="vBtn danger" type="button" title="Delete (Del)">Delete</button>
+      </div>
+      <div class="vGroup">
+        <button id="viewerHelp" class="vBtn" type="button" title="Keyboard shortcuts (?)">?</button>
+        <button id="viewerClose" class="vBtn" type="button">Close</button>
+      </div>
+    </div>
   </div>
 
   <div class="stage" id="viewerStage">
@@ -970,6 +1043,9 @@
   <h3>Viewer</h3>
   <table>
     <tr><td class="k">← / →</td><td>Previous / next image</td></tr>
+    <tr><td class="k">Shift+← / →</td><td>Cycle prompts (when panel open)</td></tr>
+    <tr><td class="k">X</td><td>Open random image</td></tr>
+    <tr><td class="k">Shift+X</td><td>Toggle shuffle slideshow</td></tr>
     <tr><td class="k">P</td><td>Prompt panel</td></tr>
     <tr><td class="k">F</td><td>Favorite</td></tr>
     <tr><td class="k">C</td><td>Copy image path</td></tr>
@@ -1086,7 +1162,12 @@ const viewerBadge = document.getElementById('viewerBadge');
 const viewerImgOverlay = document.getElementById('viewerImgOverlay');
 const viewerFilmstrip  = document.getElementById('viewerFilmstrip');
 const slideshowBtn     = document.getElementById('slideshowBtn');
+const shuffleBtn       = document.getElementById('shuffleBtn');
 const filmstripBtn     = document.getElementById('filmstripBtn');
+const viewerRandom     = document.getElementById('viewerRandom');
+const viewerHelp       = document.getElementById('viewerHelp');
+const randomOpenBtn    = document.getElementById('randomOpenBtn');
+const promptFilter     = document.getElementById('promptFilter');
 const shortcutsEl = document.getElementById('shortcuts');
 
 const pcount     = document.getElementById('pcount');
@@ -1104,6 +1185,7 @@ const hasViewerCanvas = !!vctx;
 // =====================================================================
 let files = [];   // entries: {name, path, handle, file, ext, size, lastModified}
 let view  = [];   // Array<number>, indices into files
+let _pendingOpenName = "";  // set on desktop boot with a target file to auto-open in the viewer
 let dims = [];
 let dimsP = [];
 let prompts = [];
@@ -1123,7 +1205,7 @@ let lastSelectedK = -1;
 
 let desiredCols = (() => {
   const v = Number(localStorage.getItem('fast_gallery_cols') || "4");
-  return Number.isFinite(v) ? Math.max(1, Math.min(8, Math.round(v))) : 4;
+  return Number.isFinite(v) ? Math.max(1, Math.min(12, Math.round(v))) : 4;
 })();
 
 let prefetchActive = false;
@@ -1203,7 +1285,10 @@ async function walkDirectoryFSA(dirHandle, onBatch, abortSignal, stats) {
     const b = batch; batch = [];
     try { await onBatch(b); } catch (_) {}
   };
-  const queue = [[dirHandle, dirHandle.name || ""]];
+  // Root is the anchor — files directly inside it should have folderLc="".
+  // Using dirHandle.name as the initial prefix would treat the picked folder
+  // as a subfolder of itself and break the recursive=false filter.
+  const queue = [[dirHandle, ""]];
   while (queue.length) {
     if (abortSignal?.aborted) break;
     const [cur, prefix] = queue.shift();
@@ -1218,6 +1303,7 @@ async function walkDirectoryFSA(dirHandle, onBatch, abortSignal, stats) {
           const slash = pLc.lastIndexOf("/");
           batch.push({
             name, path, handle: child, parent: cur, file: null,
+            abs: child.absPath || "",
             ext: extOf(name).slice(1),
             size: undefined, lastModified: undefined,
             pathLc: pLc,
@@ -1258,7 +1344,10 @@ async function getFileForEntry(entry) {
   if (entry.file instanceof File) return entry.file;
   try {
     const f = await entry.handle.getFile();
-    entry.file = f;
+    // In native/desktop mode File objects wrap a Vec<u8> we already have on
+    // disk — caching them just balloons JS heap. Only cache in browser/FSA
+    // where getFile() is genuinely expensive on repeat.
+    if (!window.__FG_NATIVE__) entry.file = f;
     return f;
   } catch (err) { onFileAccessError(err); throw err; }
 }
@@ -1430,7 +1519,14 @@ async function ensureDims(i) {
   if (!dimsP[i]) {
     dimsP[i] = (async () => {
       try {
-        const file = await getFileForEntry(files[i]);
+        const entry = files[i];
+        // Desktop fast path: header-only decode in Rust. No pixel read, no
+        // file bytes shipped to JS.
+        if (entry && entry.handle && entry.handle._rootId && typeof window.__fgDims === 'function') {
+          const d = await window.__fgDims(entry.handle._rootId, entry.handle._rel);
+          if (d) { dims[i] = d; return d; }
+        }
+        const file = await getFileForEntry(entry);
         const d = await getDims(file);
         dims[i] = d;
       } catch (_) {
@@ -1898,8 +1994,19 @@ function ensurePrompts(i) {
   promptsP[i] = (async () => {
     let list = [];
     try {
-      const f = await getFileForEntry(files[i]);
-      list = await extractPromptsForFile(f);
+      const entry = files[i];
+      // Desktop fast path: request just the file head. PNG/JPEG metadata for
+      // prompts lives near the start; 2 MB is enough for realistic images.
+      if (entry && entry.handle && entry.handle._rootId && typeof window.__fgReadHead === 'function') {
+        const buf = await window.__fgReadHead(entry.handle._rootId, entry.handle._rel, 2 * 1024 * 1024);
+        if (buf) {
+          const file = new File([buf], entry.name, { lastModified: entry.handle._mtimeMs || 0 });
+          list = await extractPromptsForFile(file);
+        }
+      } else {
+        const f = await getFileForEntry(entry);
+        list = await extractPromptsForFile(f);
+      }
     } catch (_) {}
     try {
       const side = await sidecarEntryForIndex(i);
@@ -1991,6 +2098,7 @@ const filterState = (() => {
   const d = {
     sortBy:'name', sortDir:'asc', query:'', formats:null,
     orientation:'all', colors:new Set(), keyword:'',
+    promptFilter:'all',
     favoritesOnly:false, randomSeed:1,
     currentPath:'', recursive:true,
   };
@@ -2005,6 +2113,7 @@ const filterState = (() => {
       if (p.orientation) d.orientation = p.orientation;
       if (Array.isArray(p.colors)) d.colors = new Set(p.colors);
       if (typeof p.keyword === 'string') d.keyword = p.keyword;
+      if (typeof p.promptFilter === 'string') d.promptFilter = p.promptFilter;
       if (typeof p.favoritesOnly === 'boolean') d.favoritesOnly = p.favoritesOnly;
       if (typeof p.currentPath === 'string') d.currentPath = p.currentPath;
       if (typeof p.recursive === 'boolean') d.recursive = p.recursive;
@@ -2021,6 +2130,7 @@ function saveFilterState() {
       orientation:filterState.orientation,
       colors:Array.from(filterState.colors),
       keyword:filterState.keyword,
+      promptFilter:filterState.promptFilter,
       favoritesOnly:filterState.favoritesOnly,
       currentPath:filterState.currentPath,
       recursive:filterState.recursive,
@@ -2103,6 +2213,11 @@ function buildView() {
     PromptKW.setTerms(filterState.keyword);
     out = out.filter(i => PromptKW.matches(prompts[i]) !== false);
   }
+  if (filterState.promptFilter === 'has') {
+    out = out.filter(i => Array.isArray(prompts[i]) && prompts[i].length > 0);
+  } else if (filterState.promptFilter === 'none') {
+    out = out.filter(i => Array.isArray(prompts[i]) && prompts[i].length === 0);
+  }
   if (filterState.favoritesOnly) {
     out = out.filter(i => favorites.has(files[i].path));
   }
@@ -2165,7 +2280,7 @@ function pickShortest(colHeights) {
 function computeLayout() {
   const W = grid.clientWidth || 0;
   const maxPossible = Math.max(1, Math.floor((W + GAP) / (MIN_COL_W + GAP)));
-  const cols = Math.max(1, Math.min(desiredCols, 8, maxPossible));
+  const cols = Math.max(1, Math.min(desiredCols, 12, maxPossible));
   const colW = Math.floor((W - GAP * (cols - 1)) / cols);
   return { cols, colW, GAP };
 }
@@ -2207,6 +2322,7 @@ function makeTileNode() {
   const img = document.createElement('img');
   img.className = 'thumb';
   img.decoding = 'async';
+  img.loading = 'lazy';
   const num = document.createElement('div'); num.className = 'num';
   const dim = document.createElement('div'); dim.className = 'dim';
   const pchip = document.createElement('div'); pchip.className = 'pchip'; pchip.textContent = 'P';
@@ -2263,12 +2379,81 @@ function resetTileNode(node) {
     img.removeAttribute('src');
     img._loadedForIndex = -1;
   }
+  node.classList.remove('loaded', 'errored');
 }
 
+// Cached blob-URL per file index. Prevents Rust thumb re-requests when the
+// user scrolls a tile out and back in. Bounded by _thumbUrlLRU below.
+const thumbUrlByIdx = new Map();
+const THUMB_URL_LRU_MAX = 2048;
+function rememberThumbUrl(idx, url) {
+  if (thumbUrlByIdx.has(idx)) return;
+  thumbUrlByIdx.set(idx, url);
+  if (thumbUrlByIdx.size > THUMB_URL_LRU_MAX) {
+    // Evict oldest by insertion order.
+    const first = thumbUrlByIdx.keys().next().value;
+    const oldUrl = thumbUrlByIdx.get(first);
+    thumbUrlByIdx.delete(first);
+    try { URL.revokeObjectURL(oldUrl); } catch (_) {}
+  }
+}
+function forgetAllThumbUrls() {
+  for (const u of thumbUrlByIdx.values()) {
+    try { URL.revokeObjectURL(u); } catch (_) {}
+  }
+  thumbUrlByIdx.clear();
+}
 function loadThumbForNode(node, i, img) {
   if (img._loadedForIndex === i && img.src) return;
   img._loadedForIndex = i;
-  if (img._objectUrl) { try { URL.revokeObjectURL(img._objectUrl); } catch (_) {} img._objectUrl = null; }
+  // Don't revoke the tile's own url — it's owned by the cache now.
+  img._objectUrl = null;
+
+  const entry = files[i];
+
+  // Reset placeholder state for the tile.
+  const tile = node;
+  tile.classList.remove('loaded', 'errored');
+
+  // Desktop fast path: request a downscaled JPEG thumb from Rust. Cached in
+  // memory (LRU) so back-and-forth scrolling doesn't re-hit Rust.
+  if (entry && entry.handle && entry.handle._rootId && typeof window.__fgThumbUrl === 'function') {
+    const cached = thumbUrlByIdx.get(i);
+    if (cached) {
+      img.alt = entry.name;
+      img.onerror = () => { if (img._loadedForIndex === i) tile.classList.add('errored'); };
+      img.addEventListener('load', () => {
+        if (img._loadedForIndex === i) tile.classList.add('loaded');
+      }, { once:true });
+      img.src = cached;
+      return;
+    }
+    (async () => {
+      const url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 512);
+      if (img._loadedForIndex !== i) {
+        if (url) URL.revokeObjectURL(url);
+        return;
+      }
+      if (!url) { tile.classList.add('errored'); return; }
+      rememberThumbUrl(i, url);
+      img.alt = entry.name;
+      img.onerror = () => {
+        if (img._loadedForIndex === i) tile.classList.add('errored');
+      };
+      img.addEventListener('load', async () => {
+        if (img._loadedForIndex !== i) return;
+        tile.classList.add('loaded');
+        try { if (img.decode) await img.decode(); } catch (_) {}
+        if (!colors[i]) {
+          const sig = computeColorSignature(img);
+          if (sig) colors[i] = sig;
+        }
+      }, { once:true });
+      img.src = url;
+    })();
+    return;
+  }
+
   (async () => {
     try {
       const file = await getFileForEntry(files[i]);
@@ -2276,15 +2461,20 @@ function loadThumbForNode(node, i, img) {
       const url = URL.createObjectURL(file);
       img._objectUrl = url;
       img.alt = files[i].name;
-      img.src = url;
+      img.onerror = () => {
+        if (img._loadedForIndex === i) tile.classList.add('errored');
+      };
       img.addEventListener('load', async () => {
+        if (img._loadedForIndex !== i) return;
+        tile.classList.add('loaded');
         try { if (img.decode) await img.decode(); } catch (_) {}
         if (!colors[i]) {
           const sig = computeColorSignature(img);
           if (sig) colors[i] = sig;
         }
       }, { once:true });
-    } catch (_) {}
+      img.src = url;
+    } catch (_) { tile.classList.add('errored'); }
   })();
 }
 
@@ -2613,6 +2803,15 @@ function showImgOverlay(file) {
     viewerCanvas.style.display = 'none';
   } catch (_) {}
 }
+function showImgOverlayUrl(url) {
+  if (viewerOverlayUrl) {
+    try { URL.revokeObjectURL(viewerOverlayUrl); } catch (_) {}
+    viewerOverlayUrl = "";
+  }
+  viewerImgOverlay.src = url;
+  viewerImgOverlay.style.display = 'block';
+  viewerCanvas.style.display = 'none';
+}
 
 function setZoomClasses() { viewer.classList.toggle('zoomed', zoomS > 1.0001); viewer.classList.toggle('dragging', dragging); }
 function stageRect() { const r = viewerStage.getBoundingClientRect(); return { w:r.width||1, h:r.height||1, left:r.left, top:r.top }; }
@@ -2738,6 +2937,32 @@ function computePreviewResize(i) {
   return { rw, rh, downscaled: (rw < d.w) || (rh < d.h) };
 }
 
+async function tryRustPreview(i, reqId) {
+  const entry = files[i];
+  if (!entry || !entry.handle || !entry.handle._rootId) return false;
+  if (typeof window.__fgThumbUrl !== 'function') return false;
+  try {
+    const url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 2048);
+    if (!url) return false;
+    if (reqId !== activeReqId) { URL.revokeObjectURL(url); return true; }
+    // Decode the downscaled JPEG — always small enough for createImageBitmap.
+    const res = await fetch(url);
+    const blob = await res.blob();
+    URL.revokeObjectURL(url);
+    const b = await createImageBitmap(blob);
+    if (reqId !== activeReqId) { closeBitmap(b); return true; }
+    bmp = b; bmpW = b.width; bmpH = b.height;
+    isFullRes = false;
+    viewer.classList.remove('loading');
+    baseScale = computeBaseScale();
+    zoomS = 1; panX = 0; panY = 0; dragging = false;
+    drawViewer();
+    updateViewerButtons(i);
+    setBadge(`Rescued preview ${bmpW}×${bmpH}`, true);
+    return true;
+  } catch (_) { return false; }
+}
+
 async function startDecode(i, wantFullRes) {
   if (!hasViewerCanvas || !isValidIndex(i)) return;
   activeReqId = ++decodeReqId;
@@ -2785,7 +3010,15 @@ async function startDecode(i, wantFullRes) {
       drawViewer();
       updateViewerButtons(i);
       if (cap) setBadge(`Capped ${cap.sw}×${cap.sh} → ${bmpW}×${bmpH}`, true);
-    } catch (_) { viewer.classList.remove('loading'); setBadge("Decode failed", true); }
+    } catch (err) {
+      // Chromium's createImageBitmap can't handle very large images (>~256 Mpx
+      // on Windows). Fall back to a Rust-side downscaled preview so the user
+      // at least sees something instead of a black canvas.
+      const rescued = await tryRustPreview(i, reqId);
+      if (rescued) return;
+      viewer.classList.remove('loading');
+      setBadge("Decode failed", true);
+    }
     return;
   }
   let msg;
@@ -2859,7 +3092,17 @@ function showPromptPanel(on) {
   showingPromptPanel = !!on;
   viewer.classList.toggle('showPrompt', showingPromptPanel);
   viewerPrompt.classList.toggle('on', showingPromptPanel && (prompts[currentIndex]?.length || 0) > 0);
+  requestAnimationFrame(syncPromptPanelHeight);
 }
+function syncPromptPanelHeight() {
+  const panel = document.getElementById('promptPanel');
+  if (!panel || !showingPromptPanel) {
+    document.documentElement.style.setProperty('--promptH', '0px');
+    return;
+  }
+  document.documentElement.style.setProperty('--promptH', (panel.offsetHeight || 0) + 'px');
+}
+window.addEventListener('resize', () => { if (showingPromptPanel) syncPromptPanelHeight(); });
 async function loadAndShowPrompts(i, autoShow) {
   viewerPrompt.disabled = true;
   viewerPrompt.textContent = "Loading…";
@@ -2893,6 +3136,7 @@ async function toggleFavForCurrent() {
 
 let slideshowTimer = 0;
 let slideshowIntervalMs = 3000;
+let shuffleMode = false;
 const SLIDESHOW_STEPS = [2000, 3000, 5000, 10000];
 function updateSlideshowBtn() {
   const on = slideshowTimer !== 0;
@@ -2900,13 +3144,37 @@ function updateSlideshowBtn() {
   slideshowBtn.textContent = `${on ? '⏸' : '▶'} ${s}s`;
   slideshowBtn.classList.toggle('on', on);
 }
+function updateShuffleBtn() {
+  if (!shuffleBtn) return;
+  shuffleBtn.classList.toggle('on', shuffleMode);
+  shuffleBtn.title = shuffleMode
+    ? 'Shuffle ON — slideshow picks randomly (Shift+X)'
+    : 'Shuffle OFF — slideshow is sequential (Shift+X)';
+}
+function toggleShuffle() { shuffleMode = !shuffleMode; updateShuffleBtn(); }
+function randomViewPos() {
+  if (!view.length) return -1;
+  if (view.length === 1) return 0;
+  // avoid staying on current image if possible
+  let p;
+  do { p = (Math.random() * view.length) | 0; } while (p === currentViewPos);
+  return p;
+}
+function slideshowTick() {
+  if (shuffleMode) {
+    const p = randomViewPos();
+    if (p >= 0) openViewer(view[p], p);
+  } else {
+    nextInView();
+  }
+}
 function stopSlideshow() {
   if (slideshowTimer) { clearInterval(slideshowTimer); slideshowTimer = 0; }
   updateSlideshowBtn();
 }
 function startSlideshow() {
   if (slideshowTimer) clearInterval(slideshowTimer);
-  slideshowTimer = setInterval(() => nextInView(), slideshowIntervalMs);
+  slideshowTimer = setInterval(slideshowTick, slideshowIntervalMs);
   updateSlideshowBtn();
 }
 function toggleSlideshow() { if (slideshowTimer) stopSlideshow(); else startSlideshow(); }
@@ -2918,6 +3186,17 @@ function cycleSlideshowInterval() {
 }
 function manualNext() { stopSlideshow(); nextInView(); }
 function manualPrev() { stopSlideshow(); prevInView(); }
+function openRandomImage() {
+  stopSlideshow();
+  if (!view.length) return;
+  const p = view.length === 1 ? 0 : randomViewPos();
+  if (p < 0) return;
+  if (viewer.classList.contains('open')) {
+    openViewer(view[p], p);
+  } else {
+    openViewer(view[p], p);
+  }
+}
 
 const filmstripUrls = new Map();
 let filmstripOn = false;
@@ -2929,6 +3208,11 @@ function revokeAllFilmstripUrls() {
 }
 async function ensureFilmstripThumb(globalIdx) {
   if (filmstripUrls.has(globalIdx)) return filmstripUrls.get(globalIdx);
+  const entry = files[globalIdx];
+  if (entry && entry.handle && entry.handle._rootId && typeof window.__fgThumbUrl === 'function') {
+    const url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 256);
+    if (url) { filmstripUrls.set(globalIdx, url); return url; }
+  }
   try {
     const f = await getFileForEntry(files[globalIdx]);
     const url = URL.createObjectURL(f);
@@ -3006,17 +3290,25 @@ async function openViewer(i, viewPos) {
   updateViewerButtons(i);
   updateFavButton();
   if (useImgOverlay(i)) {
-    try {
-      const f = await getFileForEntry(files[i]);
-      if (i === currentIndex) showImgOverlay(f);
-    } catch (_) { startDecode(i, false); }
+    // Prefer the asset protocol when we have an absolute path — no bytes in JS.
+    const abs = files[i] && files[i].abs;
+    if (abs && typeof window.__fgAssetUrl === 'function') {
+      const url = window.__fgAssetUrl(abs);
+      if (i === currentIndex) showImgOverlayUrl(url);
+    } else {
+      try {
+        const f = await getFileForEntry(files[i]);
+        if (i === currentIndex) showImgOverlay(f);
+      } catch (_) { startDecode(i, false); }
+    }
   } else {
     startDecode(i, false);
   }
   currentPromptIdx = 0;
-  showPromptPanel(false);
-  loadAndShowPrompts(i, false);
+  const keepPanel = showingPromptPanel;
+  loadAndShowPrompts(i, keepPanel);
   if (filmstripOn) renderFilmstrip();
+  refreshStatus();
 }
 function closeViewer() {
   stopSlideshow();
@@ -3032,6 +3324,8 @@ function closeViewer() {
   drawViewer();
   currentIndex = -1;
   showingPromptPanel = false;
+  document.documentElement.style.setProperty('--promptH', '0px');
+  refreshStatus();
 }
 function nextInView() {
   if (!view.length) return;
@@ -3083,6 +3377,7 @@ viewerFilmstrip.addEventListener('click', (e) => {
   }
 });
 updateSlideshowBtn();
+updateShuffleBtn();
 viewerFav.addEventListener('click', toggleFavForCurrent);
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; }
@@ -3098,7 +3393,8 @@ async function copyText(text) {
 }
 viewerCopy.addEventListener('click', async () => {
   if (!isValidIndex(currentIndex)) return;
-  const p = files[currentIndex].path;
+  const e = files[currentIndex];
+  const p = e.abs || e.path;
   const orig = viewerCopy.textContent;
   await copyText(p);
   viewerCopy.textContent = "Copied";
@@ -3112,14 +3408,20 @@ folderToastClose.addEventListener('click', () => { folderToast.style.display = '
 
 function folderPathForIndex(i) {
   if (!isValidIndex(i)) return "";
-  const rel = folderOf(files[i].path || files[i].name || "");
-  return rel;
+  const e = files[i];
+  if (e.abs) {
+    // Strip trailing basename to get the folder.
+    const s = String(e.abs);
+    const j = Math.max(s.lastIndexOf("\\"), s.lastIndexOf("/"));
+    return j < 0 ? s : s.slice(0, j);
+  }
+  return folderOf(e.path || e.name || "");
 }
 async function revealFolderForIndex(i) {
   if (!isValidIndex(i)) return;
-  const rel = folderPathForIndex(i);
-  const label = rel || "(root)";
-  await copyText(rel);
+  const abs = folderPathForIndex(i);
+  const label = abs || "(root)";
+  await copyText(abs);
   folderToastPath.textContent = label;
   folderToast.style.display = 'flex';
 }
@@ -3211,6 +3513,12 @@ window.addEventListener('keydown', (e) => {
       }
       return;
     }
+    if (e.key === 'x' || e.key === 'X') {
+      if (e.shiftKey) { toggleShuffle(); }
+      else { openRandomImage(); }
+      e.preventDefault();
+      return;
+    }
     return;
   }
   // Viewer-open shortcuts
@@ -3256,12 +3564,17 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault(); return;
   }
   if (e.key === 'ArrowLeft') {
-    if (showingPromptPanel) { pPrev.click(); e.preventDefault(); return; }
+    if (showingPromptPanel && e.shiftKey) { pPrev.click(); e.preventDefault(); return; }
     manualPrev(); e.preventDefault(); return;
   }
   if (e.key === 'ArrowRight') {
-    if (showingPromptPanel) { pNext.click(); e.preventDefault(); return; }
+    if (showingPromptPanel && e.shiftKey) { pNext.click(); e.preventDefault(); return; }
     manualNext(); e.preventDefault(); return;
+  }
+  if (e.key === 'x' || e.key === 'X') {
+    if (e.shiftKey) { toggleShuffle(); }
+    else { openRandomImage(); }
+    e.preventDefault(); return;
   }
   if (e.key === 'Delete') {
     if (confirmModal.classList.contains('open')) return;
@@ -3271,6 +3584,57 @@ window.addEventListener('keydown', (e) => {
 });
 helpBtn.addEventListener('click', () => {
   shortcutsEl.style.display = shortcutsEl.style.display === 'block' ? 'none' : 'block';
+});
+if (viewerHelp) {
+  viewerHelp.addEventListener('click', () => {
+    shortcutsEl.style.display = shortcutsEl.style.display === 'block' ? 'none' : 'block';
+  });
+}
+if (viewerRandom) {
+  viewerRandom.addEventListener('click', openRandomImage);
+}
+if (randomOpenBtn) {
+  randomOpenBtn.addEventListener('click', openRandomImage);
+}
+if (shuffleBtn) {
+  shuffleBtn.addEventListener('click', toggleShuffle);
+}
+if (promptFilter) {
+  promptFilter.value = filterState.promptFilter || 'all';
+  promptFilter.addEventListener('change', () => {
+    filterState.promptFilter = promptFilter.value;
+    saveFilterState();
+    applyFilters();
+  });
+}
+
+// Keep keyboard shortcuts alive after window blur / focus loss.
+// When focus is stuck on an <input>/<select>, window-level keydown listeners
+// receive events for those elements too, but the "editable" guard skips them.
+// Blur any focused editable when the user clicks a non-editable element or
+// when the tab regains visibility.
+document.addEventListener('mousedown', (e) => {
+  const t = e.target; const tag = t?.tagName || '';
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
+  const active = document.activeElement;
+  if (!active) return;
+  const atag = active.tagName;
+  if (atag === 'INPUT' || atag === 'SELECT' || atag === 'TEXTAREA' || active.isContentEditable) {
+    active.blur();
+  }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  const active = document.activeElement;
+  if (!active) return;
+  const atag = active.tagName;
+  if (atag === 'INPUT' || atag === 'SELECT' || atag === 'TEXTAREA') active.blur();
+});
+window.addEventListener('blur', () => {
+  const active = document.activeElement;
+  if (!active) return;
+  const atag = active.tagName;
+  if (atag === 'INPUT' || atag === 'SELECT' || atag === 'TEXTAREA') active.blur();
 });
 
 // =====================================================================
@@ -3402,6 +3766,7 @@ function doResetFilters() {
   filterState.query = ""; fnQuery.value = "";
   filterState.keyword = ""; kwQuery.value = "";
   filterState.orientation = "all"; oriSel.value = "all";
+  filterState.promptFilter = "all"; if (promptFilter) promptFilter.value = "all";
   filterState.formats = null; refreshFormatChips();
   filterState.colors.clear(); renderColorStrip();
   filterState.favoritesOnly = false; favOnlyBtn.classList.remove('on');
@@ -3649,7 +4014,7 @@ recSwitch.addEventListener('keydown', (e) => {
 colSlider.value = String(desiredCols);
 colVal.textContent = String(desiredCols);
 colSlider.addEventListener('input', () => {
-  desiredCols = Math.max(1, Math.min(8, Number(colSlider.value) || 4));
+  desiredCols = Math.max(1, Math.min(12, Number(colSlider.value) || 4));
   colVal.textContent = String(desiredCols);
   localStorage.setItem('fast_gallery_cols', String(desiredCols));
   rebuildLayout(true);
@@ -3662,9 +4027,14 @@ msSwitch.addEventListener('keydown', e => { if (e.key === "Enter" || e.key === "
 function updatePrefetchUI() {
   pfSwitch.classList.toggle('on', prefetchActive);
   pfSwitch.setAttribute('aria-checked', prefetchActive ? "true" : "false");
-  if (!prefetchActive || !files.length) { pfProg.style.display = "none"; return; }
+  if (!prefetchActive || !files.length) {
+    pfProg.style.display = "none";
+    refreshStatus();
+    return;
+  }
   pfProg.style.display = "block";
   pfProg.textContent = `${prefetchDone} / ${files.length}`;
+  refreshStatus();
 }
 async function startPrefetchPrompts() {
   if (prefetchAbort) prefetchAbort.aborted = true;
@@ -3685,7 +4055,12 @@ async function startPrefetchPrompts() {
     }
   });
   await Promise.all(workers);
-  if (!token.aborted) { updatePrefetchUI(); renderVisible(); }
+  if (!token.aborted) {
+    updatePrefetchUI();
+    // Prompt filter depends on prompts[] presence; re-apply once scan is done.
+    if (filterState.promptFilter !== 'all') applyFilters();
+    else renderVisible();
+  }
 }
 async function estimatePrefetchSize() {
   const n = files.length;
@@ -3735,9 +4110,14 @@ pfSwitch.addEventListener('keydown', e => { if (e.key === "Enter" || e.key === "
 function updatePrefetchColorsUI() {
   pcSwitch.classList.toggle('on', prefetchColorsActive);
   pcSwitch.setAttribute('aria-checked', prefetchColorsActive ? "true" : "false");
-  if (!prefetchColorsActive || !files.length) { pcProg.style.display = "none"; return; }
+  if (!prefetchColorsActive || !files.length) {
+    pcProg.style.display = "none";
+    refreshStatus();
+    return;
+  }
   pcProg.style.display = "block";
   pcProg.textContent = `${prefetchColorsDone} / ${files.length}`;
+  refreshStatus();
 }
 async function startPrefetchColors() {
   if (prefetchColorsAbort) prefetchColorsAbort.aborted = true;
@@ -3927,12 +4307,14 @@ function loaderShow(label) {
   loaderNum.textContent = "";
   loaderFill.style.width = "0%";
   loaderEl.classList.add('open', 'indet');
+  refreshStatus();
 }
 function loaderScanning(count) {
   loaderEl.classList.add('open', 'indet');
   loaderLbl.textContent = "Scanning folder";
   loaderNum.textContent = count > 0 ? `${count.toLocaleString()} images` : "";
   loaderFill.style.width = "0%";
+  refreshStatus();
 }
 function loaderProgress(label, done, total) {
   loaderEl.classList.add('open');
@@ -3941,9 +4323,66 @@ function loaderProgress(label, done, total) {
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
   loaderNum.textContent = total > 0 ? `${done.toLocaleString()} / ${total.toLocaleString()}` : "";
   loaderFill.style.width = pct + "%";
+  refreshStatus();
 }
 function loaderHide() {
   loaderEl.classList.remove('open', 'indet');
+  refreshStatus();
+}
+
+// =====================================================================
+// Dynamic tab title (async, rAF-debounced so large-folder progress
+// updates never block the layout thread).
+// =====================================================================
+let _lastTitle = "";
+let _titleRaf = 0;
+let dimsActive = false, dimsDone = 0, dimsTotal = 0;
+function shortNum(n) {
+  n = Number(n) || 0;
+  if (n < 1000) return String(n);
+  if (n < 10_000) {
+    const v = n / 1000;
+    return (v >= 9.95 ? Math.round(v) : v.toFixed(1)).toString().replace(/\.0$/, "") + "k";
+  }
+  if (n < 1_000_000) return Math.round(n / 1000) + "k";
+  const m = n / 1_000_000;
+  return (m >= 9.95 ? Math.round(m) : m.toFixed(1)).toString().replace(/\.0$/, "") + "M";
+}
+function computeStatusTitle() {
+  const busy = loaderEl.classList.contains('open');
+  const bg = (prefetchActive || prefetchColorsActive || dimsActive);
+  const empty = !files.length;
+  const viewing = viewer.classList.contains('open') && isValidIndex(currentIndex);
+  if (busy) {
+    const lbl = (typeof loaderLbl !== 'undefined' && loaderLbl.textContent) || "working";
+    const num = (typeof loaderNum !== 'undefined' && loaderNum.textContent) || "";
+    const s = num ? `${lbl} ${num.replace(/\s/g, '')}` : lbl;
+    return `●FG›${s.toLowerCase()}`;
+  }
+  if (viewing) {
+    const nm = files[currentIndex]?.name || "";
+    return `▸FG›${nm}`;
+  }
+  if (bg) {
+    const total = Math.max(files.length, dimsTotal);
+    let done = 0, label = 'scan';
+    if (dimsActive) { done = dimsDone; label = 'dims'; }
+    else if (prefetchActive || prefetchColorsActive) {
+      done = Math.max(prefetchDone || 0, prefetchColorsDone || 0);
+      label = prefetchActive ? 'prompts' : 'colors';
+    }
+    return `◐FG›${label} ${shortNum(done)}/${shortNum(total)}`;
+  }
+  if (empty) return "Fast Gallery";
+  return `●FG›${shortNum(files.length)} img`;
+}
+function refreshStatus() {
+  if (_titleRaf) return;
+  _titleRaf = requestAnimationFrame(() => {
+    _titleRaf = 0;
+    const t = computeStatusTitle();
+    if (t !== _lastTitle) { document.title = t; _lastTitle = t; }
+  });
 }
 
 // =====================================================================
@@ -3953,6 +4392,7 @@ async function resetAndLoadFiles(entries, key) {
   if (prefetchAbort) { prefetchAbort.aborted = true; prefetchAbort = null; }
   if (prefetchColorsAbort) { prefetchColorsAbort.aborted = true; prefetchColorsAbort = null; }
   sidecarCache.clear();
+  forgetAllThumbUrls();
   files = entries;
   dims = new Array(files.length);
   dimsP = new Array(files.length);
@@ -3973,22 +4413,64 @@ async function resetAndLoadFiles(entries, key) {
   updatePrefetchUI();
   updatePrefetchColorsUI();
 
+  // Guardrail: if a stale filter would leave the grid empty despite the
+  // folder having files, relax the two most-likely culprits and re-save.
+  // Prevents the "0 shown, nothing renders" trap after opening a new root.
   if (files.length) {
-    const first = Math.min(400, files.length);
-    loaderProgress("Reading image dimensions", 0, first);
-    await ensureFirstDims(first, (done, total) => {
-      loaderProgress("Reading image dimensions", done, total);
-    });
+    let relaxed = false;
+    // Try a dry-run buildView; if empty, clear the filters that most often
+    // hide everything on a new root.
+    view = buildView();
+    if (view.length === 0) {
+      if (!filterState.recursive) { filterState.recursive = true; syncRecSwitch(); relaxed = true; }
+      if (filterState.currentPath) { filterState.currentPath = ""; relaxed = true; }
+      if (filterState.favoritesOnly) { filterState.favoritesOnly = false; favOnlyBtn.classList.remove('on'); relaxed = true; }
+      if (relaxed) { saveFilterState(); renderFolderStrip(); }
+    }
   }
 
+  // Render the grid + viewer path immediately. Dimensions and thumbnails are
+  // pulled in the background; the grid tolerates null dims until they land.
   applyFilters();
   loaderHide();
+  refreshStatus();
+
+  // Auto-open BEFORE any dim scan, so double-click-image → viewer opens in
+  // ~one file read instead of waiting for the whole folder to be measured.
+  maybeAutoOpenFromBoot();
+
+  if (files.length) {
+    // Prioritize the file we just auto-opened, then the first-viewport batch,
+    // then the rest.
+    ensureFirstDimsInBackground(Math.min(400, files.length));
+  }
 
   if (prefetchActive && files.length) startPrefetchPrompts();
   if (prefetchColorsActive && files.length) startPrefetchColors();
 }
 
+function maybeAutoOpenFromBoot() {
+  if (!_pendingOpenName || !files.length) return;
+  const target = _pendingOpenName;
+  _pendingOpenName = "";
+  const lc = target.toLowerCase();
+  let fileIdx = files.findIndex(f => (f.name || "").toLowerCase() === lc);
+  if (fileIdx < 0) {
+    fileIdx = files.findIndex(f => {
+      const p = String(f.path || f.name || "").toLowerCase();
+      const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+      return (i < 0 ? p : p.slice(i + 1)) === lc;
+    });
+  }
+  if (fileIdx < 0) return;
+  const vpos = view.indexOf(fileIdx);
+  if (vpos < 0) return;
+  requestAnimationFrame(() => openViewer(view[vpos], vpos));
+}
+
 async function ensureFirstDims(n, onProgress) {
+  // Legacy sync version — kept for callers that need to await. New paths use
+  // ensureFirstDimsInBackground instead.
   const upto = Math.min(n, files.length);
   const idxs = [];
   for (let i = 0; i < upto; i++) idxs.push(i);
@@ -4000,14 +4482,35 @@ async function ensureFirstDims(n, onProgress) {
   });
   ensureRestDimsInBackground(upto);
 }
+function ensureFirstDimsInBackground(n) {
+  const upto = Math.min(n, files.length);
+  const idxs = [];
+  for (let i = 0; i < upto; i++) idxs.push(i);
+  dimsActive = true; dimsDone = 0; dimsTotal = files.length;
+  refreshStatus();
+  mapLimit(idxs, 4, async (i) => {
+    await ensureDims(i);
+    dimsDone++;
+    // Re-layout every ~16 arrivals so tile aspect ratios settle progressively.
+    if ((dimsDone & 15) === 0 || dimsDone === upto) { onScrollOrResize(); refreshStatus(); }
+  }).then(() => {
+    onScrollOrResize();
+    ensureRestDimsInBackground(upto);
+  });
+}
 async function ensureRestDimsInBackground(startFrom) {
   const idxs = [];
   for (let i = startFrom; i < files.length; i++) idxs.push(i);
-  if (!idxs.length) return;
-  mapLimit(idxs, 8, async (i) => {
+  if (!idxs.length) { dimsActive = false; refreshStatus(); return; }
+  mapLimit(idxs, 3, async (i) => {
     await ensureDims(i);
-    if ((i & 63) === 0) onScrollOrResize();
-  }).then(() => { applyFilters(); });
+    dimsDone++;
+    if ((i & 63) === 0) { onScrollOrResize(); refreshStatus(); }
+  }).then(() => {
+    dimsActive = false;
+    refreshStatus();
+    applyFilters();
+  });
 }
 
 async function loadViaFSA(dirHandle) {
@@ -4091,13 +4594,46 @@ async function pickFolder() {
     catch (_) { return; }
     if (!handle) return;
     reopenBanner.style.display = "none";
-    await idbPut(STORE_HANDLES, handle, HANDLE_KEY);
+    if (!window.__FG_NATIVE__) {
+      // Only real FSA handles are structured-cloneable into IndexedDB.
+      try { await idbPut(STORE_HANDLES, handle, HANDLE_KEY); } catch (_) {}
+    }
     await loadViaFSA(handle);
   } else {
     dirInput.click();
   }
 }
 pickBtn.addEventListener('click', pickFolder);
+
+// Desktop boot: file-association / second-instance dispatches fg-boot-open.
+// Payload = { file, root }. root is an absolute folder path; file is a basename.
+async function handleFgBootOpen(payload) {
+  if (!payload || !payload.root) return;
+  if (typeof window.__fgOpenPathAsRoot !== 'function') return; // browser build
+  try {
+    // If the same root is already open, skip re-scan and just re-target the viewer.
+    const wantName = payload.root.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
+    const rootStillOpen = currentRootHandle && (currentRootHandle.name || '') === wantName && files.length;
+    _pendingOpenName = payload.file || '';
+    if (rootStillOpen) {
+      maybeAutoOpenFromBoot();
+      return;
+    }
+    reopenBanner.style.display = 'none';
+    const handle = await window.__fgOpenPathAsRoot(payload.root);
+    if (!handle) { _pendingOpenName = ''; return; }
+    // Native handles are not structured-cloneable; skip IDB persistence.
+    await loadViaFSA(handle);
+  } catch (err) {
+    console.error('fg-boot-open failed:', err);
+    _pendingOpenName = '';
+  }
+}
+window.addEventListener('fg-boot-open', (e) => { handleFgBootOpen(e.detail); });
+// If the shim already stashed args before this listener registered, fire once.
+if (window.__FG_INITIAL_ARGS__) {
+  handleFgBootOpen(window.__FG_INITIAL_ARGS__);
+}
 dirInput.addEventListener('change', async () => {
   reopenBanner.style.display = "none";
   currentRootHandle = null;
@@ -4303,6 +4839,8 @@ setMultiselect(false);
 updatePrefetchUI();
 updatePrefetchColorsUI();
 updateSlideshowBtn();
+updateShuffleBtn();
+refreshStatus();
 requestAnimationFrame(() => { syncBarHeight(); drawViewer(); });
 
 window.addEventListener('beforeunload', () => {
