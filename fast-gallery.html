@@ -41,7 +41,11 @@
   body{
     margin:0; background:var(--bg); color:var(--fg);
     font:13px/1.4 var(--font-ui);
-    overflow-y:scroll; padding-top:var(--barH);
+    overflow-y:auto; padding-top:var(--barH);
+    /* Reserve gutter so content doesn't jump when the scrollbar appears /
+       disappears (grid loads, filters change). Supported in Chromium/Firefox;
+       degrades to a small layout jump on older engines — acceptable. */
+    scrollbar-gutter:stable;
     -webkit-font-smoothing:antialiased;
   }
   html.noscroll, body.noscroll { overflow:hidden; }
