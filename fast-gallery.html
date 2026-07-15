@@ -721,7 +721,13 @@
   /* -------- Empty state -------- */
   #empty{
     display:flex; align-items:flex-start; gap:24px;
-    padding:64px 40px 80px; min-height:calc(100vh - var(--barH));
+    padding:64px 40px 80px;
+    /* Fill remaining viewport under the fixed top bar, but subtract this
+       block's own vertical padding so total height doesn't exceed 100vh
+       (body has padding-top:var(--barH), so any extra bleed shows a
+       vertical scrollbar next to an obviously-empty gallery). */
+    min-height:calc(100vh - var(--barH) - 64px - 80px);
+    box-sizing:content-box;
     color:var(--muted);
     background:var(--bg);
     margin:0;
