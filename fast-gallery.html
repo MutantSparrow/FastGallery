@@ -133,6 +133,56 @@
   }
   #pickBtn.btn:hover{ background:#e78a3c; border-color:#e78a3c; }
 
+  /* Window controls — chromeless window. Hidden by default, shown when the
+     Tauri shim reports itself as native. Windows-style 46px icon buttons. */
+  .winCtl{
+    display:none;
+    align-items:stretch; align-self:stretch;
+    margin-left:8px;
+    height:var(--tap);
+  }
+  body.fg-native .winCtl{ display:inline-flex; }
+  .winCtl button{
+    width:46px; height:var(--tap);
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:0;
+    background:transparent; color:var(--fg-dim);
+    border:1px solid var(--rule);
+    border-radius:0;
+    cursor:pointer; user-select:none;
+    font:14px/1 var(--font-ui);
+    transition:background .1s ease, color .1s ease, border-color .1s ease;
+  }
+  .winCtl button + button{ border-left:none; }
+  .winCtl button:hover{
+    background:var(--paper-2); color:var(--fg); border-color:var(--rule-strong);
+  }
+  .winCtl button.close:hover{
+    background:var(--danger); color:#fff; border-color:var(--danger);
+  }
+  .winCtl button:focus-visible{
+    outline:none; box-shadow:0 0 0 1px var(--fg-dim);
+  }
+  .winCtl .max .maxIcon{ display:inline; }
+  .winCtl .max .restoreIcon{ display:none; }
+  body.maximized .winCtl .max .maxIcon{ display:none; }
+  body.maximized .winCtl .max .restoreIcon{ display:inline; }
+  /* Interactive children of a drag region must opt out so clicks reach them. */
+  [data-tauri-drag-region] button,
+  [data-tauri-drag-region] input,
+  [data-tauri-drag-region] select,
+  [data-tauri-drag-region] textarea,
+  [data-tauri-drag-region] .toggle,
+  [data-tauri-drag-region] .ctrl,
+  [data-tauri-drag-region] .winCtl{
+    -webkit-app-region: no-drag;
+  }
+  /* Fullscreen floating window controls: mount next to fsMenuBtn */
+  #viewer.fullscreen .fsMenu .winCtl{
+    background:rgba(10,10,10,.85);
+    backdrop-filter:blur(10px);
+  }
+
   /* Meta text (counts, dims). Numbers in mono. */
   .meta{
     color:var(--muted); white-space:nowrap;
@@ -943,8 +993,8 @@
 </head>
 <body>
 
-<div class="bar" id="topBar">
-  <div class="row" id="row1">
+<div class="bar" id="topBar" data-tauri-drag-region>
+  <div class="row" id="row1" data-tauri-drag-region>
     <button id="pickBtn" class="btn" title="Open a folder (or drop one on the window)">Open folder</button>
     <div class="divider"></div>
     <div id="count" class="meta">0 images</div>
@@ -982,9 +1032,14 @@
     <button id="dlAllBtn" class="btn" style="display:none" title="Download selected images as a ZIP">Download</button>
     <button id="delAllBtn" class="btn danger" style="display:none" title="Delete selected images (Del)">Delete</button>
     <button id="helpBtn" class="btn" title="Show keyboard shortcuts (?)">?</button>
+    <div class="winCtl" data-winctl-scope="bar">
+      <button class="min" type="button" title="Minimize" aria-label="Minimize">–</button>
+      <button class="max" type="button" title="Maximize / restore" aria-label="Maximize / restore"><span class="maxIcon">▢</span><span class="restoreIcon">❐</span></button>
+      <button class="close" type="button" title="Close (hide to tray)" aria-label="Close">×</button>
+    </div>
   </div>
 
-  <div class="row" id="row2">
+  <div class="row" id="row2" data-tauri-drag-region>
     <span class="eyebrow">Sort</span>
     <select id="sortBy" title="Sort images by attribute">
       <option value="name">Name</option>
@@ -1110,9 +1165,9 @@
 <div id="grid" aria-live="polite"></div>
 
 <div id="viewer" role="dialog" aria-modal="true" aria-hidden="true">
-  <div class="top">
-    <div class="topLeft">
-      <div id="viewerTitle" class="title"></div>
+  <div class="top" data-tauri-drag-region>
+    <div class="topLeft" data-tauri-drag-region>
+      <div id="viewerTitle" class="title" data-tauri-drag-region></div>
       <div id="viewerDims" class="vdims"></div>
     </div>
     <div class="topActions">
@@ -1143,6 +1198,11 @@
         <button id="viewerHelp" class="vBtn" type="button" title="Keyboard shortcuts (?)">?</button>
         <button id="viewerClose" class="vBtn ghost" type="button" title="Close viewer (Esc)">Close</button>
       </div>
+      <div class="winCtl" data-winctl-scope="viewer">
+        <button class="min" type="button" title="Minimize" aria-label="Minimize">–</button>
+        <button class="max" type="button" title="Maximize / restore" aria-label="Maximize / restore"><span class="maxIcon">▢</span><span class="restoreIcon">❐</span></button>
+        <button class="close" type="button" title="Close (hide to tray)" aria-label="Close">×</button>
+      </div>
     </div>
   </div>
 
@@ -1155,6 +1215,11 @@
       <button id="fsStripNext" class="fsNav right" type="button" aria-label="Scroll filmstrip right" title="Scroll filmstrip right">▶</button>
     </div>
     <div id="fsMenu" class="fsMenu">
+      <div class="winCtl" data-winctl-scope="fs">
+        <button class="min" type="button" title="Minimize" aria-label="Minimize">–</button>
+        <button class="max" type="button" title="Maximize / restore" aria-label="Maximize / restore"><span class="maxIcon">▢</span><span class="restoreIcon">❐</span></button>
+        <button class="close" type="button" title="Close (hide to tray)" aria-label="Close">×</button>
+      </div>
       <button id="fsMenuBtn" class="fsMenuBtn" type="button" title="Show controls menu" aria-label="Controls menu">☰</button>
       <div id="fsPanel" class="fsPanel" role="menu">
         <div id="fsPanelTitle" class="fsTitle"></div>
@@ -5143,6 +5208,45 @@ window.addEventListener('fg-boot-open', (e) => { handleFgBootOpen(e.detail); });
 // If the shim already stashed args before this listener registered, fire once.
 if (window.__FG_INITIAL_ARGS__) {
   handleFgBootOpen(window.__FG_INITIAL_ARGS__);
+}
+
+// Chromeless window: wire min/max/close buttons + sync body.maximized.
+// Tauri v2 exposes window controls via window.__TAURI__.window.getCurrentWindow().
+// The shim sets window.__FG_NATIVE__=true only under Tauri, so browser mode
+// leaves .winCtl hidden and this init is a no-op.
+if (window.__FG_NATIVE__) {
+  document.body.classList.add('fg-native');
+  const tauriWin = window.__TAURI__ && window.__TAURI__.window;
+  const appWin = tauriWin && typeof tauriWin.getCurrentWindow === 'function'
+    ? tauriWin.getCurrentWindow()
+    : null;
+  if (appWin) {
+    const syncMaxState = async () => {
+      try {
+        const max = await appWin.isMaximized();
+        document.body.classList.toggle('maximized', !!max);
+      } catch (_) {}
+    };
+    syncMaxState();
+    // onResized fires on maximize/restore/user-resize; a Move can also change it.
+    try { appWin.onResized && appWin.onResized(() => { syncMaxState(); }); } catch (_) {}
+    try { appWin.onMoved && appWin.onMoved(() => { syncMaxState(); }); } catch (_) {}
+    document.querySelectorAll('.winCtl').forEach((group) => {
+      const min = group.querySelector('.min');
+      const max = group.querySelector('.max');
+      const close = group.querySelector('.close');
+      if (min) min.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); appWin.minimize().catch(() => {}); });
+      if (max) max.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        appWin.toggleMaximize().catch(() => {}).finally(syncMaxState);
+      });
+      if (close) close.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        // Routes through CloseRequested handler in src-tauri/src/lib.rs → tray-hide.
+        appWin.close().catch(() => {});
+      });
+    });
+  }
 }
 dirInput.addEventListener('change', async () => {
   reopenBanner.style.display = "none";
