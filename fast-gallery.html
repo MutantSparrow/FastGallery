@@ -475,8 +475,44 @@
     background:rgba(10,10,10,.75);
     border:1px solid var(--signal);
     user-select:none; pointer-events:none; display:none;
+    cursor:help;
   }
-  .tile[data-hasprompt="1"] .pchip{display:block}
+  .tile[data-hasprompt="1"] .pchip{display:block; pointer-events:auto;}
+  .tile[data-hasprompt="1"] .pchip:hover{ background:var(--signal); color:#0a0a0a; }
+
+  /* Floating prompt preview — anchored to a hovered .pchip. Scroll to switch
+     between prompts when a file has multiple. */
+  #promptTip{
+    position:fixed; z-index:6000;
+    display:none;
+    max-width:min(520px, 60vw);
+    background:var(--paper-2);
+    color:var(--fg);
+    border:1px solid var(--rule-strong);
+    border-left:2px solid var(--signal);
+    box-shadow:0 8px 24px rgba(0,0,0,.55);
+    padding:10px 12px 8px;
+    pointer-events:auto;
+  }
+  #promptTip.open{ display:block; }
+  #promptTip .ptipHdr{
+    display:flex; align-items:baseline; gap:10px;
+    margin-bottom:6px;
+    font:600 10px/1 var(--font-ui); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted);
+  }
+  #promptTip .ptipHdr .ptipIdx{ color:var(--signal-fg); }
+  #promptTip .ptipHdr .ptipHint{
+    margin-left:auto;
+    font:10px/1 var(--font-mono); letter-spacing:.04em;
+    color:var(--muted); text-transform:none;
+  }
+  #promptTip .ptipBody{
+    max-height:38vh; overflow:auto;
+    font:12px/1.5 var(--font-mono);
+    color:var(--fg);
+    white-space:pre-wrap; word-break:break-word;
+  }
   /* Folder chip on tile — bottom-left, above dim, muted */
   .fchip{
     position:absolute; left:8px; bottom:22px;
@@ -1164,6 +1200,15 @@
 </div>
 <div id="grid" aria-live="polite"></div>
 
+<div id="promptTip" role="tooltip" aria-hidden="true">
+  <div class="ptipHdr">
+    <span>Prompt</span>
+    <span class="ptipIdx" id="promptTipIdx">1 / 1</span>
+    <span class="ptipHint" id="promptTipHint">wheel to cycle</span>
+  </div>
+  <div class="ptipBody" id="promptTipBody"></div>
+</div>
+
 <div id="viewer" role="dialog" aria-modal="true" aria-hidden="true">
   <div class="top" data-tauri-drag-region>
     <div class="topLeft" data-tauri-drag-region>
@@ -1298,6 +1343,10 @@ const dirInput = document.getElementById('dirInput');
 const pickBtn  = document.getElementById('pickBtn');
 const grid     = document.getElementById('grid');
 const empty    = document.getElementById('empty');
+const promptTip     = document.getElementById('promptTip');
+const promptTipIdx  = document.getElementById('promptTipIdx');
+const promptTipHint = document.getElementById('promptTipHint');
+const promptTipBody = document.getElementById('promptTipBody');
 const countEl  = document.getElementById('count');
 const viewCountWrap = document.getElementById('viewCountWrap');
 const viewCountEl   = document.getElementById('viewCount');
@@ -3652,6 +3701,7 @@ async function openViewer(i, viewPos) {
   // Invalidate any in-flight decode from a previous open so its late result
   // can't paint the old bitmap over the new one.
   activeReqId = ++decodeReqId;
+  if (typeof hidePromptTip === 'function') hidePromptTip();
   hideImgOverlay();
   closeBitmap(bmp); bmp = null; bmpW = 1; bmpH = 1;
   currentIndex = i;
@@ -4280,6 +4330,112 @@ grid.addEventListener('change', (ev) => {
   updateSelectionUI();
   renderVisible();
 });
+
+// Prompt tooltip on P chip. Hover shows the current prompt, longest first.
+// Mouse wheel over the chip OR over the tooltip cycles between available
+// prompts while the tooltip is open.
+let _ptipFileIdx = -1;
+let _ptipPromptIdx = 0;
+let _ptipList = null;         // sorted [{text, origIdx}], longest first
+let _ptipHideTimer = 0;
+function sortPromptsForTooltip(rawList) {
+  if (!Array.isArray(rawList)) return [];
+  return rawList
+    .map((t, i) => ({ text: String(t == null ? '' : t), origIdx: i }))
+    .filter(p => p.text.length > 0)
+    .sort((a, b) => b.text.length - a.text.length);
+}
+function renderPromptTip() {
+  if (!_ptipList || !_ptipList.length) { hidePromptTip(); return; }
+  const total = _ptipList.length;
+  if (_ptipPromptIdx < 0) _ptipPromptIdx = 0;
+  if (_ptipPromptIdx >= total) _ptipPromptIdx = total - 1;
+  promptTipIdx.textContent = `${_ptipPromptIdx + 1} / ${total}`;
+  promptTipHint.style.display = total > 1 ? '' : 'none';
+  promptTipBody.textContent = _ptipList[_ptipPromptIdx].text;
+  promptTipBody.scrollTop = 0;
+}
+function positionPromptTip(anchorRect) {
+  // Anchor to the P chip; prefer to the right, fall back to left, then above.
+  const pad = 8;
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  // Measure by making it visible off-screen first.
+  promptTip.style.visibility = 'hidden';
+  promptTip.classList.add('open');
+  const tw = promptTip.offsetWidth;
+  const th = promptTip.offsetHeight;
+  let left = anchorRect.right + pad;
+  let top  = anchorRect.top;
+  if (left + tw > vw - pad) left = anchorRect.left - tw - pad;
+  if (left < pad) left = pad;
+  if (top + th > vh - pad) top = Math.max(pad, vh - th - pad);
+  if (top < pad) top = pad;
+  promptTip.style.left = left + 'px';
+  promptTip.style.top  = top  + 'px';
+  promptTip.style.visibility = '';
+  promptTip.setAttribute('aria-hidden', 'false');
+}
+function showPromptTipForChip(chip) {
+  const tile = chip.closest('.tile');
+  if (!tile) return;
+  const i = Number(tile.dataset.index);
+  if (!isValidIndex(i)) return;
+  const list = sortPromptsForTooltip(prompts[i]);
+  if (!list.length) return;
+  if (_ptipHideTimer) { clearTimeout(_ptipHideTimer); _ptipHideTimer = 0; }
+  // Preserve the current prompt index when re-entering the same chip so the
+  // user's wheel position isn't lost by a brief mouseleave.
+  if (i !== _ptipFileIdx) { _ptipFileIdx = i; _ptipPromptIdx = 0; }
+  _ptipList = list;
+  renderPromptTip();
+  positionPromptTip(chip.getBoundingClientRect());
+}
+function hidePromptTip() {
+  promptTip.classList.remove('open');
+  promptTip.setAttribute('aria-hidden', 'true');
+  _ptipList = null;
+  _ptipFileIdx = -1;
+}
+function scheduleHidePromptTip() {
+  if (_ptipHideTimer) clearTimeout(_ptipHideTimer);
+  _ptipHideTimer = setTimeout(() => { _ptipHideTimer = 0; hidePromptTip(); }, 120);
+}
+grid.addEventListener('mouseover', (ev) => {
+  const chip = ev.target.closest('.pchip');
+  if (!chip) return;
+  const tile = chip.closest('.tile');
+  if (!tile || tile.dataset.hasprompt !== '1') return;
+  showPromptTipForChip(chip);
+});
+grid.addEventListener('mouseout', (ev) => {
+  const chip = ev.target.closest('.pchip');
+  if (!chip) return;
+  const to = ev.relatedTarget;
+  if (to && (to.closest?.('#promptTip') || to.closest?.('.pchip') === chip)) return;
+  scheduleHidePromptTip();
+});
+promptTip.addEventListener('mouseenter', () => {
+  if (_ptipHideTimer) { clearTimeout(_ptipHideTimer); _ptipHideTimer = 0; }
+});
+promptTip.addEventListener('mouseleave', scheduleHidePromptTip);
+function ptipWheel(ev) {
+  if (!_ptipList || _ptipList.length <= 1) return;
+  ev.preventDefault();
+  const dir = ev.deltaY > 0 ? 1 : -1;
+  _ptipPromptIdx = (_ptipPromptIdx + dir + _ptipList.length) % _ptipList.length;
+  renderPromptTip();
+}
+grid.addEventListener('wheel', (ev) => {
+  const chip = ev.target.closest('.pchip');
+  if (!chip) return;
+  if (!promptTip.classList.contains('open')) return;
+  ptipWheel(ev);
+}, { passive: false });
+promptTip.addEventListener('wheel', ptipWheel, { passive: false });
+// Hide tooltip on scroll / resize / viewer open — anchor stops being valid.
+window.addEventListener('scroll', () => { if (promptTip.classList.contains('open')) hidePromptTip(); }, { passive: true });
+window.addEventListener('resize', () => { if (promptTip.classList.contains('open')) hidePromptTip(); });
 
 // =====================================================================
 // Filter bar wiring
