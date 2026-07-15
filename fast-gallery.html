@@ -477,8 +477,35 @@
     user-select:none; pointer-events:none; display:none;
     cursor:help;
   }
-  .tile[data-hasprompt="1"] .pchip{display:block; pointer-events:auto;}
+  .tile[data-hasprompt="1"] .pchip{display:block; pointer-events:auto; cursor:pointer;}
   .tile[data-hasprompt="1"] .pchip:hover{ background:var(--signal); color:#0a0a0a; }
+  .tile[data-hasprompt="1"] .pchip.copied{
+    background:var(--signal); color:#0a0a0a;
+    animation:pchipFlash .6s ease-out;
+  }
+  @keyframes pchipFlash{
+    0%   { transform:scale(1);   box-shadow:0 0 0 0 var(--signal); }
+    30%  { transform:scale(1.4); box-shadow:0 0 0 6px rgba(217,123,42,.35); }
+    100% { transform:scale(1);   box-shadow:0 0 0 0 rgba(217,123,42,0); }
+  }
+  /* Tiny toast flying up from wherever the P chip was — brief, non-blocking. */
+  #promptCopyFlash{
+    position:fixed; z-index:6100;
+    padding:6px 10px;
+    background:var(--signal); color:#0a0a0a;
+    border:1px solid var(--signal);
+    font:600 11px/1 var(--font-ui);
+    letter-spacing:.08em; text-transform:uppercase;
+    box-shadow:0 6px 18px rgba(0,0,0,.55);
+    pointer-events:none;
+    opacity:0;
+    transform:translate(-50%, 0);
+    transition:opacity .15s ease, transform .35s ease;
+  }
+  #promptCopyFlash.show{
+    opacity:1;
+    transform:translate(-50%, -18px);
+  }
 
   /* Floating prompt preview — anchored to a hovered .pchip. Scroll to switch
      between prompts when a file has multiple. */
@@ -1200,6 +1227,8 @@
 </div>
 <div id="grid" aria-live="polite"></div>
 
+<div id="promptCopyFlash" role="status" aria-live="polite">Prompt copied</div>
+
 <div id="promptTip" role="tooltip" aria-hidden="true">
   <div class="ptipHdr">
     <span>Prompt</span>
@@ -1347,6 +1376,7 @@ const promptTip     = document.getElementById('promptTip');
 const promptTipIdx  = document.getElementById('promptTipIdx');
 const promptTipHint = document.getElementById('promptTipHint');
 const promptTipBody = document.getElementById('promptTipBody');
+const promptCopyFlash = document.getElementById('promptCopyFlash');
 const countEl  = document.getElementById('count');
 const viewCountWrap = document.getElementById('viewCountWrap');
 const viewCountEl   = document.getElementById('viewCount');
@@ -4257,6 +4287,15 @@ window.addEventListener('blur', () => {
 // Grid interactions
 // =====================================================================
 grid.addEventListener('click', (ev) => {
+  const pchip = ev.target.closest('.pchip');
+  if (pchip) {
+    const tile = pchip.closest('.tile');
+    if (tile && tile.dataset.hasprompt === '1') {
+      ev.preventDefault(); ev.stopPropagation();
+      copyPromptFromChip(pchip);
+    }
+    return;
+  }
   const dlBtn = ev.target.closest('.dl');
   if (dlBtn) {
     const tile = dlBtn.closest('.tile');
@@ -4396,6 +4435,53 @@ function hidePromptTip() {
   promptTip.setAttribute('aria-hidden', 'true');
   _ptipList = null;
   _ptipFileIdx = -1;
+}
+let _promptFlashTimer = 0;
+function showPromptCopyFlash(anchorRect) {
+  if (!promptCopyFlash) return;
+  // Position centered horizontally on the chip, just above it.
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  const cx = anchorRect.left + anchorRect.width / 2;
+  const cy = anchorRect.top;
+  promptCopyFlash.style.left = Math.max(60, Math.min(vw - 60, cx)) + 'px';
+  promptCopyFlash.style.top  = Math.max(4, cy - 6) + 'px';
+  // Force reflow so the transition replays if the class is re-added.
+  promptCopyFlash.classList.remove('show');
+  // eslint-disable-next-line no-unused-expressions
+  promptCopyFlash.offsetWidth;
+  promptCopyFlash.classList.add('show');
+  if (_promptFlashTimer) clearTimeout(_promptFlashTimer);
+  _promptFlashTimer = setTimeout(() => {
+    promptCopyFlash.classList.remove('show');
+    _promptFlashTimer = 0;
+  }, 900);
+}
+async function copyPromptFromChip(chip) {
+  const tile = chip.closest('.tile');
+  if (!tile) return;
+  const i = Number(tile.dataset.index);
+  if (!isValidIndex(i)) return;
+  // Prefer whatever the user is currently reading in the tooltip; otherwise
+  // fall back to the longest prompt for this file.
+  let text = '';
+  if (_ptipList && _ptipFileIdx === i && _ptipList[_ptipPromptIdx]) {
+    text = _ptipList[_ptipPromptIdx].text;
+  } else {
+    const sorted = sortPromptsForTooltip(prompts[i]);
+    if (sorted.length) text = sorted[0].text;
+  }
+  if (!text) return;
+  const rect = chip.getBoundingClientRect();
+  const ok = await copyText(text);
+  if (!ok) return;
+  // Visual feedback: chip flashes signal color + a small floating badge above.
+  chip.classList.remove('copied');
+  // eslint-disable-next-line no-unused-expressions
+  chip.offsetWidth;
+  chip.classList.add('copied');
+  setTimeout(() => chip.classList.remove('copied'), 700);
+  showPromptCopyFlash(rect);
+  hidePromptTip();
 }
 function scheduleHidePromptTip() {
   if (_ptipHideTimer) clearTimeout(_ptipHideTimer);
