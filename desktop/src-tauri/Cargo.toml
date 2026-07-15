@@ -1,6 +1,6 @@
 [package]
 name = "fast-gallery"
-version = "1.4.3"
+version = "1.4.4"
 description = "Fast Gallery — desktop wrapper"
 authors = ["Fast Gallery"]
 edition = "2021"

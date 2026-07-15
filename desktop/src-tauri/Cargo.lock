@@ -1127,7 +1127,7 @@ dependencies = [
 
 [[package]]
 name = "fast-gallery"
-version = "1.4.3"
+version = "1.4.4"
 dependencies = [
  "image",
  "percent-encoding",

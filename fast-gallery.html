@@ -49,6 +49,8 @@
     -webkit-font-smoothing:antialiased;
   }
   html.noscroll, body.noscroll { overflow:hidden; }
+  /* No folder loaded → no scroll target exists, so suppress the gutter entirely. */
+  body.nofiles{ overflow:hidden; scrollbar-gutter:auto; }
 
   /* -------- Bar -------- */
   .bar{
@@ -1064,7 +1066,7 @@
   }
 </style>
 </head>
-<body>
+<body class="nofiles">
 
 <div class="bar" id="topBar" data-tauri-drag-region>
   <div class="row" id="row1" data-tauri-drag-region>
@@ -3032,6 +3034,7 @@ async function performDeleteIndexes(indexes) {
 
   countEl.textContent = `${files.length} image${files.length === 1 ? "" : "s"}`;
   empty.style.display = files.length ? "none" : "block";
+  document.body.classList.toggle('nofiles', !files.length);
   refreshFormatChips();
   renderFolderStrip();
   updateSelectionUI();
@@ -5223,6 +5226,7 @@ async function resetAndLoadFiles(entries, key) {
   favorites = await loadFavoritesFor(rootKey);
 
   empty.style.display = files.length ? "none" : "block";
+  document.body.classList.toggle('nofiles', !files.length);
   countEl.textContent = `${files.length} image${files.length === 1 ? "" : "s"}`;
 
   refreshFormatChips();
