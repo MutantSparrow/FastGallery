@@ -82,8 +82,16 @@
   #promptPanel .pnav button:hover, #promptPanel .pact button:hover{
     background:var(--paper-3); border-color:var(--rule-strong);
   }
-  .btn:focus-visible, #viewer button.vBtn:focus-visible{
-    outline:none; border-color:var(--fg-dim);
+  .btn:focus-visible, #viewer button.vBtn:focus-visible,
+  #confirmModal .actions .btn:focus-visible,
+  #promptPanel .pnav button:focus-visible, #promptPanel .pact button:focus-visible{
+    outline:none;
+    border-color:var(--fg-dim);
+    box-shadow:0 0 0 1px var(--fg-dim);
+  }
+  .btn.danger:focus-visible, #viewer button.vBtn.danger:focus-visible{
+    border-color:var(--danger);
+    box-shadow:0 0 0 1px var(--danger);
   }
   .btn[disabled], #viewer button.vBtn[disabled],
   #promptPanel .pnav button[disabled]{
@@ -100,6 +108,23 @@
   }
   .btn.danger:hover, #viewer button.vBtn.danger:hover{
     background:var(--danger); border-color:var(--danger); color:#fff;
+  }
+  /* Ghost — for dismiss / cancel / close controls. Reads as "not the action". */
+  .btn.ghost, #viewer button.vBtn.ghost, #promptPanel .pact button.ghost{
+    background:transparent;
+    color:var(--fg-dim);
+    border-color:var(--rule);
+  }
+  .btn.ghost:hover, #viewer button.vBtn.ghost:hover, #promptPanel .pact button.ghost:hover{
+    background:var(--paper-2);
+    color:var(--fg);
+    border-color:var(--rule-strong);
+  }
+  /* Armed — one-more-click-to-confirm affordance (used on Reset filters) */
+  .btn.armed{
+    border-color:var(--danger);
+    color:var(--danger-fg);
+    background:var(--danger-wash);
   }
 
   /* Primary = pickBtn only */
@@ -530,10 +555,31 @@
   #confirmModal.open{display:flex}
   #confirmModal .box{
     background:var(--paper-2); border:1px solid var(--rule);
+    border-top:2px solid var(--rule-strong);
     border-radius:0; padding:22px 24px; max-width:520px;
     min-width:340px;
+    position:relative;
   }
+  /* Danger stripe up top when the modal's action is destructive */
+  #confirmModal.danger .box{ border-top-color:var(--danger); }
   #confirmModal .eyebrow{margin-bottom:6px}
+  #confirmModal.danger .eyebrow{ color:var(--danger-fg); }
+  #confirmModal .hint{
+    margin-top:12px;
+    font:11px/1 var(--font-mono);
+    color:var(--muted);
+    letter-spacing:.04em;
+  }
+  #confirmModal .hint kbd{
+    display:inline-block;
+    padding:1px 5px; margin:0 2px;
+    border:1px solid var(--rule);
+    border-bottom-width:2px;
+    background:var(--bg);
+    color:var(--fg-dim);
+    font:600 10px/1 var(--font-mono);
+    letter-spacing:.04em;
+  }
   #confirmModal h3{
     margin:0 0 10px;
     font:500 18px/1.2 var(--font-ui); letter-spacing:-.005em;
@@ -618,10 +664,6 @@
   #folderToast .meta{
     flex:1 1 auto; overflow:hidden; text-overflow:ellipsis;
     font:12px/1 var(--font-mono); color:var(--fg);
-  }
-  #resetFilters.armed{
-    border-color:var(--danger);
-    color:var(--danger-fg);
   }
 
   /* -------- Depth legend -------- */
@@ -937,14 +979,14 @@
 
     <div class="divider"></div>
 
-    <button id="dlAllBtn" class="btn" style="display:none" title="Download selected as a ZIP">Download</button>
-    <button id="delAllBtn" class="btn danger" style="display:none" title="Delete selected">Delete</button>
-    <button id="helpBtn" class="btn" title="Keyboard shortcuts">?</button>
+    <button id="dlAllBtn" class="btn" style="display:none" title="Download selected images as a ZIP">Download</button>
+    <button id="delAllBtn" class="btn danger" style="display:none" title="Delete selected images (Del)">Delete</button>
+    <button id="helpBtn" class="btn" title="Show keyboard shortcuts (?)">?</button>
   </div>
 
   <div class="row" id="row2">
     <span class="eyebrow">Sort</span>
-    <select id="sortBy" title="Sort by">
+    <select id="sortBy" title="Sort images by attribute">
       <option value="name">Name</option>
       <option value="date">Date</option>
       <option value="size">Size</option>
@@ -953,22 +995,22 @@
       <option value="area">Area</option>
       <option value="random">Random</option>
     </select>
-    <button id="sortDir" class="btn" title="Toggle sort direction">↑</button>
+    <button id="sortDir" class="btn" title="Toggle ascending / descending">↑</button>
 
     <div class="divider"></div>
 
     <span class="eyebrow">Filter</span>
-    <input id="fnQuery" type="search" placeholder="Filename" />
-    <input id="kwQuery" type="search" placeholder="Prompt keywords" />
+    <input id="fnQuery" type="search" placeholder="Filename" title="Filter by filename (substring match)" />
+    <input id="kwQuery" type="search" placeholder="Prompt keywords" title="Filter by prompt text — requires Prompts scan" />
 
-    <select id="oriSel" title="Orientation">
+    <select id="oriSel" title="Filter by image orientation">
       <option value="all">Any orientation</option>
       <option value="portrait">Portrait</option>
       <option value="landscape">Landscape</option>
       <option value="square">Square</option>
     </select>
 
-    <select id="promptFilter" title="Filter by prompt metadata">
+    <select id="promptFilter" title="Filter by presence of prompt metadata">
       <option value="all">Any prompt</option>
       <option value="has">Has prompt</option>
       <option value="none">No prompt</option>
@@ -987,7 +1029,7 @@
 
     <button id="randomOpenBtn" class="btn" title="Open a random image (X)">🎲 Random</button>
     <button id="favOnly" class="btn" title="Show favorites only">★ Favorites</button>
-    <button id="resetFilters" class="btn" title="Clear all filters">Reset</button>
+    <button id="resetFilters" class="btn" title="Clear all filters — click again to confirm">Reset filters</button>
   </div>
 
   <div id="folderRow" class="folderRow hidden">
@@ -997,8 +1039,8 @@
     <span class="eyebrow">Subfolders</span>
     <div id="folderStrip" class="folderStrip"></div>
     <div class="folderRowActions">
-      <button id="folderUpBtn" class="folderMore" title="Go up one folder" style="display:none">↑ Up</button>
-      <button id="folderModeBtn" class="folderMore" title="Toggle wrap vs. scroll">Wrap</button>
+      <button id="folderUpBtn" class="folderMore" title="Go up one folder level" style="display:none">↑ Up</button>
+      <button id="folderModeBtn" class="folderMore" title="Toggle wrap / single-row scroll for folder chips">Wrap</button>
     </div>
   </div>
 
@@ -1009,30 +1051,30 @@
 
 <div id="reopenBanner">
   <span id="reopenText">Reopen last folder?</span>
-  <button id="reopenYes" class="btn">Reopen</button>
-  <button id="reopenNo" class="btn">Dismiss</button>
+  <button id="reopenYes" class="btn" title="Reopen last folder (Y)">Reopen</button>
+  <button id="reopenNo" class="btn ghost" title="Dismiss (N)">Dismiss</button>
 </div>
 
 <div id="permBanner">
-  <span id="permText">Folder access was revoked. Re-grant to keep browsing.</span>
-  <button id="permRegrant" class="btn">Re-grant</button>
-  <button id="permDismiss" class="btn">Dismiss</button>
+  <span id="permText">Folder access was revoked. Grant access to keep browsing.</span>
+  <button id="permRegrant" class="btn" title="Grant folder access (Y)">Grant access</button>
+  <button id="permDismiss" class="btn ghost" title="Dismiss (N)">Dismiss</button>
 </div>
 
 <div id="walkToast">
   <span id="walkToastText"></span>
-  <button id="walkToastClose" class="btn">Dismiss</button>
+  <button id="walkToastClose" class="btn ghost" title="Dismiss">Dismiss</button>
 </div>
 
 <div id="quotaToast">
   <span id="quotaToastText">Favorites not saved — storage full or unavailable.</span>
-  <button id="quotaToastClose" class="btn">Dismiss</button>
+  <button id="quotaToastClose" class="btn ghost" title="Dismiss">Dismiss</button>
 </div>
 
 <div id="folderToast">
   <span class="eyebrow">Folder path copied</span>
   <span id="folderToastPath" class="meta"></span>
-  <button id="folderToastClose" class="btn">Dismiss</button>
+  <button id="folderToastClose" class="btn ghost" title="Dismiss">Dismiss</button>
 </div>
 
 <div id="loader" role="status" aria-live="polite">
@@ -1050,9 +1092,10 @@
     <div id="confirmMsg" class="msg"></div>
     <div id="confirmList" class="list"></div>
     <div class="actions">
-      <button id="confirmCancel" class="btn" type="button">Cancel</button>
-      <button id="confirmOk" class="btn danger" type="button">Delete</button>
+      <button id="confirmCancel" class="btn ghost" type="button" title="Cancel (N / Esc)">Cancel</button>
+      <button id="confirmOk" class="btn danger" type="button" title="Confirm (Y / Enter)">Delete</button>
     </div>
+    <div class="hint"><kbd>Y</kbd> confirm · <kbd>N</kbd> or <kbd>Esc</kbd> cancel</div>
   </div>
 </div>
 
@@ -1074,8 +1117,8 @@
     </div>
     <div class="topActions">
       <div class="vGroup">
-        <button id="viewerPrev" class="vBtn navBtn" type="button" aria-label="Previous">◀</button>
-        <button id="viewerNext" class="vBtn navBtn" type="button" aria-label="Next">▶</button>
+        <button id="viewerPrev" class="vBtn navBtn" type="button" aria-label="Previous" title="Previous image (←)">◀</button>
+        <button id="viewerNext" class="vBtn navBtn" type="button" aria-label="Next" title="Next image (→)">▶</button>
         <button id="viewerRandom" class="vBtn" type="button" title="Random image (X)">🎲</button>
         <button id="slideshowBtn" class="vBtn" type="button" title="Slideshow (S) — Alt-click cycles interval">▶ 3s</button>
         <button id="shuffleBtn" class="vBtn" type="button" title="Shuffle slideshow (Shift+X)">⇄</button>
@@ -1089,16 +1132,16 @@
           Prompt
         </button>
         <button id="viewerFav" class="vBtn" type="button" title="Favorite (F)">☆</button>
-        <button id="viewerCopy" class="vBtn" type="button" title="Copy path (C)">Copy</button>
-        <button id="viewerFolder" class="vBtn" type="button" title="Copy folder path (Shift+C)">Folder</button>
-        <button id="viewerDl" class="vBtn" type="button" title="Download original">Download</button>
-        <button id="viewerFull" class="vBtn" type="button" title="Full resolution">Full-res</button>
-        <button id="viewerDel" class="vBtn danger" type="button" title="Delete (Del)">Delete</button>
+        <button id="viewerCopy" class="vBtn" type="button" title="Copy image path (C)">Copy path</button>
+        <button id="viewerFolder" class="vBtn" type="button" title="Copy folder path (Shift+C)">Copy folder</button>
+        <button id="viewerDl" class="vBtn" type="button" title="Download original file">Download</button>
+        <button id="viewerFull" class="vBtn" type="button" title="Decode at full resolution">Actual size</button>
+        <button id="viewerDel" class="vBtn danger" type="button" title="Delete image (Del)">Delete</button>
       </div>
       <div class="vGroup">
-        <button id="viewerFullscreen" class="vBtn" type="button" title="Fullscreen (Z)">⛶</button>
+        <button id="viewerFullscreen" class="vBtn" type="button" title="Fullscreen mode (Z)">⛶</button>
         <button id="viewerHelp" class="vBtn" type="button" title="Keyboard shortcuts (?)">?</button>
-        <button id="viewerClose" class="vBtn" type="button">Close</button>
+        <button id="viewerClose" class="vBtn ghost" type="button" title="Close viewer (Esc)">Close</button>
       </div>
     </div>
   </div>
@@ -1107,12 +1150,12 @@
     <canvas id="viewerCanvas"></canvas>
     <img id="viewerImgOverlay" alt="" />
     <div class="filmstripWrap">
-      <button id="fsStripPrev" class="fsNav left" type="button" aria-label="Scroll filmstrip left">◀</button>
+      <button id="fsStripPrev" class="fsNav left" type="button" aria-label="Scroll filmstrip left" title="Scroll filmstrip left">◀</button>
       <div id="viewerFilmstrip"></div>
-      <button id="fsStripNext" class="fsNav right" type="button" aria-label="Scroll filmstrip right">▶</button>
+      <button id="fsStripNext" class="fsNav right" type="button" aria-label="Scroll filmstrip right" title="Scroll filmstrip right">▶</button>
     </div>
     <div id="fsMenu" class="fsMenu">
-      <button id="fsMenuBtn" class="fsMenuBtn" type="button" title="Menu">☰</button>
+      <button id="fsMenuBtn" class="fsMenuBtn" type="button" title="Show controls menu" aria-label="Controls menu">☰</button>
       <div id="fsPanel" class="fsPanel" role="menu">
         <div id="fsPanelTitle" class="fsTitle"></div>
         <div class="fsRows" id="fsPanelRows"></div>
@@ -1128,12 +1171,12 @@
       <div class="ptitle">Prompt</div>
       <div id="pcount" class="pcount"></div>
       <div class="pnav">
-        <button id="pPrev" type="button">◀</button>
-        <button id="pNext" type="button">▶</button>
+        <button id="pPrev" type="button" title="Previous prompt (Shift+←)">◀</button>
+        <button id="pNext" type="button" title="Next prompt (Shift+→)">▶</button>
       </div>
       <div class="pact">
-        <button id="pCopy" type="button">Copy</button>
-        <button id="pClose" type="button">Hide</button>
+        <button id="pCopy" type="button" title="Copy prompt text">Copy prompt</button>
+        <button id="pClose" class="ghost" type="button" title="Close prompt panel (P)">Close</button>
       </div>
     </div>
     <div id="promptText" class="empty">No prompt data.</div>
@@ -1170,6 +1213,11 @@
     <tr><td class="k">Del</td><td>Delete selection</td></tr>
     <tr><td class="k">Esc</td><td>Clear selection / exit select mode</td></tr>
     <tr><td class="k">?</td><td>Toggle this help</td></tr>
+  </table>
+  <h3 style="margin-top:20px">Modals &amp; banners</h3>
+  <table>
+    <tr><td class="k">Y / Enter</td><td>Confirm</td></tr>
+    <tr><td class="k">N / Esc</td><td>Cancel / dismiss</td></tr>
   </table>
 </div>
 
@@ -2733,11 +2781,15 @@ async function downloadIndex(i) {
 // Delete
 // =====================================================================
 let confirmPending = null;
-function openConfirmModal({title, message, listItems, dangerLabel, onConfirm}) {
+function openConfirmModal({title, message, listItems, dangerLabel, onConfirm, isDanger}) {
   confirmTitle.textContent = title || "Confirm";
   confirmMsg.innerHTML = message || "";
   confirmList.textContent = (listItems && listItems.length) ? listItems.join("\n") : "";
   confirmOk.textContent = dangerLabel || "Delete";
+  // Default to danger visuals — every current caller is a destructive action.
+  const danger = (typeof isDanger === 'boolean') ? isDanger : true;
+  confirmOk.classList.toggle('danger', danger);
+  confirmModal.classList.toggle('danger', danger);
   confirmPending = onConfirm || null;
   confirmModal.classList.add('open');
   confirmModal.setAttribute('aria-hidden', 'false');
@@ -2745,6 +2797,7 @@ function openConfirmModal({title, message, listItems, dangerLabel, onConfirm}) {
 }
 function closeConfirmModal() {
   confirmModal.classList.remove('open');
+  confirmModal.classList.remove('danger');
   confirmModal.setAttribute('aria-hidden', 'true');
   confirmPending = null;
 }
@@ -3880,6 +3933,35 @@ pCopy.addEventListener('click', async () => {
 });
 
 window.addEventListener('keydown', (e) => {
+  // Modal + banner Y/N shortcuts take precedence over everything else.
+  if (confirmModal.classList.contains('open')) {
+    if (e.key === 'y' || e.key === 'Y' || e.key === 'Enter') {
+      e.preventDefault(); e.stopPropagation();
+      confirmOk.click();
+      return;
+    }
+    if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') {
+      e.preventDefault(); e.stopPropagation();
+      closeConfirmModal();
+      return;
+    }
+    // Swallow other keys so grid/viewer shortcuts don't fire beneath the modal.
+    if (e.key.length === 1 || e.key === 'Delete' || e.key === 'Tab') return;
+  }
+  // Reopen / permission banners: Y confirms, N dismisses. Only fire when the
+  // key target isn't a text input (so typing in filters keeps working).
+  const tgt = e.target;
+  const inputActive = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.tagName === 'SELECT' || tgt.isContentEditable);
+  if (!inputActive) {
+    if (reopenBanner && reopenBanner.style.display === 'flex') {
+      if (e.key === 'y' || e.key === 'Y' || e.key === 'Enter') { e.preventDefault(); reopenYes.click(); return; }
+      if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') { e.preventDefault(); reopenNo.click(); return; }
+    }
+    if (permBanner && permBanner.style.display === 'flex') {
+      if (e.key === 'y' || e.key === 'Y' || e.key === 'Enter') { e.preventDefault(); permRegrant.click(); return; }
+      if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') { e.preventDefault(); permDismiss.click(); return; }
+    }
+  }
   if (e.key === '?') {
     if (!e.ctrlKey && !e.metaKey) {
       shortcutsEl.style.display = shortcutsEl.style.display === 'block' ? 'none' : 'block';
