@@ -650,6 +650,53 @@
     border-bottom:1px solid var(--rule);
     backdrop-filter:blur(10px); z-index:2;
   }
+  #viewer.fullscreen .top{ display:none; }
+  #viewer.fullscreen .stage{ inset:0; }
+  /* Fullscreen menu: floating button + collapsible panel top-right */
+  #viewer .fsMenu{
+    position:absolute; top:10px; right:10px;
+    display:none; z-index:5;
+    align-items:flex-start; gap:8px;
+    flex-direction:row-reverse;
+  }
+  #viewer.fullscreen .fsMenu{ display:flex; }
+  #viewer .fsMenuBtn{
+    width:40px; height:40px; padding:0;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:rgba(10,10,10,.85);
+    border:1px solid var(--rule);
+    color:var(--fg);
+    font:600 18px/1 var(--font-mono);
+    cursor:pointer;
+    backdrop-filter:blur(10px);
+  }
+  #viewer .fsMenuBtn:hover{ border-color:var(--rule-strong); background:rgba(20,20,20,.95); }
+  #viewer .fsPanel{
+    display:none;
+    max-width:min(520px, calc(100vw - 80px));
+    max-height:calc(100vh - 40px);
+    overflow-y:auto;
+    padding:10px;
+    background:rgba(10,10,10,.94);
+    border:1px solid var(--rule);
+    backdrop-filter:blur(12px);
+  }
+  #viewer .fsPanel.open{ display:block; }
+  #viewer .fsPanel .fsTitle{
+    font:12px/1 var(--font-mono); color:var(--fg-dim);
+    padding:0 4px 8px; margin-bottom:8px;
+    border-bottom:1px solid var(--rule);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  #viewer .fsPanel .fsRows{
+    display:flex; flex-direction:column; gap:8px;
+  }
+  #viewer .fsPanel .fsRow{
+    display:flex; gap:6px; flex-wrap:wrap;
+  }
+  #viewer .fsPanel .fsRow .vGroup{
+    flex-wrap:wrap;
+  }
   #viewer .topLeft{
     flex:1 1 0; min-width:0;
     display:flex; gap:10px; align-items:center;
@@ -696,33 +743,77 @@
     background:#000;
     user-select:none;
   }
-  #viewer #viewerFilmstrip{
+  #viewer .filmstripWrap{
     position:absolute; left:0; right:0; bottom:0;
     height:88px; display:none;
+    z-index:3;
+  }
+  #viewer.showFilmstrip .filmstripWrap{ display:block; }
+  #viewer.showFilmstrip.showPrompt .filmstripWrap{ bottom:var(--promptH, 45vh); }
+  #viewer.fullscreen .filmstripWrap{ display:none; }
+  #viewer #viewerFilmstrip{
+    position:absolute; inset:0;
     background:rgba(10,10,10,.85);
     border-top:1px solid var(--rule);
     overflow-x:auto; overflow-y:hidden; white-space:nowrap;
-    padding:4px 8px; z-index:3;
+    padding:4px 40px; z-index:1;
+    scroll-behavior:smooth;
+    /* Firefox scrollbar hide */
+    scrollbar-width:none;
   }
-  #viewer.showFilmstrip #viewerFilmstrip{ display:block; }
-  #viewer.showFilmstrip.showPrompt #viewerFilmstrip{ bottom:var(--promptH, 45vh); }
+  #viewerFilmstrip::-webkit-scrollbar{ display:none; }
+  #viewerFilmstrip .ftrack{
+    position:relative; height:80px;
+    display:block;
+  }
   #viewerFilmstrip .fcell{
-    display:inline-block; width:64px; height:80px;
-    margin-right:4px; border-radius:0; overflow:hidden;
+    position:absolute; top:0;
+    width:64px; height:80px;
+    border-radius:0; overflow:hidden;
     border:1px solid var(--rule);
-    background:#000; cursor:pointer; position:relative;
-    vertical-align:top;
+    background:#000; cursor:pointer;
   }
   #viewerFilmstrip .fcell:hover{border-color:var(--rule-strong)}
   #viewerFilmstrip .fcell.active{ border-color:var(--signal); }
   #viewerFilmstrip .fcell img{
     width:100%; height:64px; object-fit:cover; display:block;
+    opacity:0; transition:opacity .12s ease;
   }
+  #viewerFilmstrip .fcell.loaded img{ opacity:1; }
+  #viewerFilmstrip .fcell::before{
+    content:""; position:absolute; left:0; right:0; top:0; height:64px;
+    background:
+      linear-gradient(90deg, transparent 0%, rgba(255,255,255,.06) 50%, transparent 100%)
+      #0a0a0a;
+    background-size:200% 100%;
+    animation:tileShimmer 1.4s linear infinite;
+    z-index:0;
+    pointer-events:none;
+  }
+  #viewerFilmstrip .fcell.loaded::before,
+  #viewerFilmstrip .fcell.errored::before{ display:none; }
   #viewerFilmstrip .fcell .fcap{
+    position:absolute; left:0; right:0; bottom:0;
     display:block; text-align:center;
     font:10px/1 var(--font-mono); color:var(--fg-dim);
     line-height:14px; padding-top:1px;
+    background:rgba(10,10,10,.65);
+    z-index:1;
   }
+  #viewer .fsNav{
+    position:absolute; top:0; bottom:0; width:36px;
+    display:none; align-items:center; justify-content:center;
+    background:rgba(10,10,10,.85);
+    border:1px solid var(--rule);
+    color:var(--fg);
+    cursor:pointer; z-index:2;
+    font:600 16px/1 var(--font-mono);
+    user-select:none;
+  }
+  #viewer .fsNav:hover{ background:rgba(20,20,20,.95); border-color:var(--rule-strong); }
+  #viewer .fsNav.visible{ display:flex; }
+  #viewer .fsNav.left{ left:0; border-top:1px solid var(--rule); border-left:none; }
+  #viewer .fsNav.right{ right:0; border-top:1px solid var(--rule); border-right:none; }
   #viewer .loading{
     position:absolute; left:14px; bottom:14px;
     padding:6px 10px; border-radius:0;
@@ -1005,6 +1096,7 @@
         <button id="viewerDel" class="vBtn danger" type="button" title="Delete (Del)">Delete</button>
       </div>
       <div class="vGroup">
+        <button id="viewerFullscreen" class="vBtn" type="button" title="Fullscreen (Z)">⛶</button>
         <button id="viewerHelp" class="vBtn" type="button" title="Keyboard shortcuts (?)">?</button>
         <button id="viewerClose" class="vBtn" type="button">Close</button>
       </div>
@@ -1014,7 +1106,18 @@
   <div class="stage" id="viewerStage">
     <canvas id="viewerCanvas"></canvas>
     <img id="viewerImgOverlay" alt="" />
-    <div id="viewerFilmstrip"></div>
+    <div class="filmstripWrap">
+      <button id="fsStripPrev" class="fsNav left" type="button" aria-label="Scroll filmstrip left">◀</button>
+      <div id="viewerFilmstrip"></div>
+      <button id="fsStripNext" class="fsNav right" type="button" aria-label="Scroll filmstrip right">▶</button>
+    </div>
+    <div id="fsMenu" class="fsMenu">
+      <button id="fsMenuBtn" class="fsMenuBtn" type="button" title="Menu">☰</button>
+      <div id="fsPanel" class="fsPanel" role="menu">
+        <div id="fsPanelTitle" class="fsTitle"></div>
+        <div class="fsRows" id="fsPanelRows"></div>
+      </div>
+    </div>
   </div>
 
   <div class="loading">Decoding…</div>
@@ -1055,6 +1158,7 @@
     <tr><td class="k">R / Shift+R</td><td>Rotate cw / ccw</td></tr>
     <tr><td class="k">S</td><td>Slideshow</td></tr>
     <tr><td class="k">T</td><td>Filmstrip</td></tr>
+    <tr><td class="k">Z</td><td>Fullscreen mode</td></tr>
     <tr><td class="k">Del</td><td>Delete image</td></tr>
     <tr><td class="k">Esc</td><td>Close panel, then viewer</td></tr>
   </table>
@@ -1161,6 +1265,14 @@ const viewerCanvas= document.getElementById('viewerCanvas');
 const viewerBadge = document.getElementById('viewerBadge');
 const viewerImgOverlay = document.getElementById('viewerImgOverlay');
 const viewerFilmstrip  = document.getElementById('viewerFilmstrip');
+const fsStripPrev      = document.getElementById('fsStripPrev');
+const fsStripNext      = document.getElementById('fsStripNext');
+const viewerFullscreen = document.getElementById('viewerFullscreen');
+const fsMenu           = document.getElementById('fsMenu');
+const fsMenuBtn        = document.getElementById('fsMenuBtn');
+const fsPanel          = document.getElementById('fsPanel');
+const fsPanelTitle     = document.getElementById('fsPanelTitle');
+const fsPanelRows      = document.getElementById('fsPanelRows');
 const slideshowBtn     = document.getElementById('slideshowBtn');
 const shuffleBtn       = document.getElementById('shuffleBtn');
 const filmstripBtn     = document.getElementById('filmstripBtn');
@@ -2564,7 +2676,10 @@ window.addEventListener('resize', () => {
   _resizeTimer = setTimeout(() => {
     syncBarHeight();
     if (files.length) rebuildLayout(true);
-    if (viewer.classList.contains('open')) { baseScale = computeBaseScale(); drawViewer(); updateViewerButtons(currentIndex); }
+    if (viewer.classList.contains('open')) {
+      baseScale = computeBaseScale(); drawViewer(); updateViewerButtons(currentIndex);
+      if (filmstripOn) { renderFilmstripVisible(); updateFsNavVisibility(); }
+    }
   }, 120);
 });
 let _resizeTimer = null;
@@ -3198,80 +3313,229 @@ function openRandomImage() {
   }
 }
 
-const filmstripUrls = new Map();
+// Filmstrip: virtualized track. Track width scales with view.length so every
+// image has its own scroll slot; only cells inside a scrollLeft window are
+// mounted. Off-screen cells are recycled. Thumbs are cached across view
+// positions so scrolling and paging never refetch, and near-viewport cells
+// prefetch as long as the filmstrip is open.
+const FS_CELL_W = 64;
+const FS_CELL_GAP = 4;
+const FS_CELL_H = 80;
+const FS_OVERSCAN = 12;
+const filmstripUrls = new Map(); // globalIdx -> blob URL (kept while filmstrip open)
+const filmstripPending = new Map(); // globalIdx -> Promise<url>
 let filmstripOn = false;
+let _userClosedFilmstrip = false;
+let fsTrackEl = null;
+const fsMounted = new Map();   // viewPos -> DOM node
+const fsPool = [];             // recycled cells
+
 function revokeAllFilmstripUrls() {
   for (const u of filmstripUrls.values()) {
     try { URL.revokeObjectURL(u); } catch (_) {}
   }
   filmstripUrls.clear();
+  filmstripPending.clear();
 }
+function stepPx() { return FS_CELL_W + FS_CELL_GAP; }
 async function ensureFilmstripThumb(globalIdx) {
   if (filmstripUrls.has(globalIdx)) return filmstripUrls.get(globalIdx);
-  const entry = files[globalIdx];
-  if (entry && entry.handle && entry.handle._rootId && typeof window.__fgThumbUrl === 'function') {
-    const url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 256);
-    if (url) { filmstripUrls.set(globalIdx, url); return url; }
-  }
-  try {
-    const f = await getFileForEntry(files[globalIdx]);
-    const url = URL.createObjectURL(f);
-    filmstripUrls.set(globalIdx, url);
-    return url;
-  } catch (_) { return ""; }
+  const existing = filmstripPending.get(globalIdx);
+  if (existing) return existing;
+  const p = (async () => {
+    const entry = files[globalIdx];
+    if (entry && entry.handle && entry.handle._rootId && typeof window.__fgThumbUrl === 'function') {
+      const url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 256);
+      if (url) { filmstripUrls.set(globalIdx, url); return url; }
+    }
+    try {
+      const f = await getFileForEntry(files[globalIdx]);
+      const url = URL.createObjectURL(f);
+      filmstripUrls.set(globalIdx, url);
+      return url;
+    } catch (_) { return ""; }
+  })();
+  filmstripPending.set(globalIdx, p);
+  p.finally(() => filmstripPending.delete(globalIdx));
+  return p;
 }
+
+function makeFsCell() {
+  const cell = document.createElement('div');
+  cell.className = 'fcell';
+  const img = document.createElement('img');
+  img.decoding = 'async'; img.alt = '';
+  const cap = document.createElement('span');
+  cap.className = 'fcap';
+  cell.appendChild(img); cell.appendChild(cap);
+  return cell;
+}
+function resetFsCell(node) {
+  const img = node.querySelector('img');
+  if (img) { img.removeAttribute('src'); img._forGI = -1; }
+  node.classList.remove('loaded','errored','active');
+}
+function loadFsCellImg(node, gi) {
+  const img = node.querySelector('img');
+  if (!img) return;
+  if (img._forGI === gi && img.src) return;
+  img._forGI = gi;
+  img.removeAttribute('src');
+  node.classList.remove('loaded','errored');
+  const cached = filmstripUrls.get(gi);
+  if (cached) { setSrc(img, cached, gi, node); return; }
+  ensureFilmstripThumb(gi).then((u) => {
+    if (!filmstripOn) return;
+    if (img._forGI !== gi) return;
+    if (!u) { node.classList.add('errored'); return; }
+    setSrc(img, u, gi, node);
+  });
+}
+function setSrc(img, url, gi, node) {
+  img.onerror = () => { if (img._forGI === gi) node.classList.add('errored'); };
+  img.addEventListener('load', () => {
+    if (img._forGI === gi) node.classList.add('loaded');
+  }, { once:true });
+  img.src = url;
+}
+
+function fsTrackWidth() {
+  const total = view.length || 0;
+  if (!total) return 0;
+  return total * FS_CELL_W + Math.max(0, total - 1) * FS_CELL_GAP;
+}
+
+function ensureFsTrack() {
+  if (fsTrackEl && fsTrackEl.parentNode === viewerFilmstrip) return fsTrackEl;
+  viewerFilmstrip.innerHTML = "";
+  fsTrackEl = document.createElement('div');
+  fsTrackEl.className = 'ftrack';
+  viewerFilmstrip.appendChild(fsTrackEl);
+  return fsTrackEl;
+}
+
+function fsVisibleRange() {
+  const stripW = viewerFilmstrip.clientWidth || 0;
+  const sl = viewerFilmstrip.scrollLeft || 0;
+  const step = stepPx();
+  const from = Math.max(0, Math.floor(sl / step) - FS_OVERSCAN);
+  const to   = Math.min(view.length - 1, Math.ceil((sl + stripW) / step) + FS_OVERSCAN);
+  return { from, to };
+}
+
+function renderFilmstripVisible() {
+  if (!filmstripOn || !view.length) return;
+  ensureFsTrack();
+  fsTrackEl.style.width = fsTrackWidth() + "px";
+  const { from, to } = fsVisibleRange();
+  const seen = new Set();
+  const step = stepPx();
+  for (let k = from; k <= to; k++) {
+    seen.add(k);
+    let node = fsMounted.get(k);
+    if (!node) {
+      node = fsPool.pop() || makeFsCell();
+      fsMounted.set(k, node);
+    }
+    node.style.left = (k * step) + "px";
+    node.dataset.pos = String(k);
+    node.querySelector('.fcap').textContent = String(k + 1);
+    node.classList.toggle('active', k === currentViewPos);
+    const gi = view[k];
+    loadFsCellImg(node, gi);
+    if (!node.isConnected) fsTrackEl.appendChild(node);
+  }
+  for (const [k, node] of fsMounted) {
+    if (seen.has(k)) continue;
+    fsMounted.delete(k);
+    if (node.parentNode) node.parentNode.removeChild(node);
+    resetFsCell(node);
+    if (fsPool.length < 60) fsPool.push(node);
+  }
+  updateFsNavVisibility();
+}
+
+function scrollFilmstripToActive(behavior) {
+  if (!filmstripOn || !view.length) return;
+  const step = stepPx();
+  const target = currentViewPos * step + FS_CELL_W / 2;
+  const clientW = viewerFilmstrip.clientWidth || 0;
+  const scrollW = viewerFilmstrip.scrollWidth || 0;
+  const maxScroll = Math.max(0, scrollW - clientW);
+  const desired = Math.max(0, Math.min(maxScroll, target - clientW / 2));
+  if (behavior === 'auto') {
+    // Bypass smooth scroll for the initial position on viewer open.
+    viewerFilmstrip.style.scrollBehavior = 'auto';
+    viewerFilmstrip.scrollLeft = desired;
+    viewerFilmstrip.style.scrollBehavior = '';
+  } else {
+    viewerFilmstrip.scrollLeft = desired;
+  }
+}
+
+function updateFsNavVisibility() {
+  if (!filmstripOn) {
+    fsStripPrev.classList.remove('visible');
+    fsStripNext.classList.remove('visible');
+    return;
+  }
+  const sl = viewerFilmstrip.scrollLeft || 0;
+  const clientW = viewerFilmstrip.clientWidth || 0;
+  const scrollW = viewerFilmstrip.scrollWidth || 0;
+  const maxScroll = Math.max(0, scrollW - clientW);
+  const canScroll = maxScroll > 1;
+  fsStripPrev.classList.toggle('visible', canScroll && sl > 1);
+  fsStripNext.classList.toggle('visible', canScroll && sl < maxScroll - 1);
+}
+
 function renderFilmstrip() {
   if (!filmstripOn) return;
-  if (!view.length) { viewerFilmstrip.innerHTML = ""; return; }
-  const total = view.length;
-  const center = clamp(currentViewPos, 0, total - 1);
-  const from = Math.max(0, center - 10);
-  const to   = Math.min(total - 1, center + 10);
-  const frag = document.createDocumentFragment();
-  const wanted = new Set();
-  for (let k = from; k <= to; k++) {
-    const gi = view[k];
-    wanted.add(gi);
-    const cell = document.createElement('div');
-    cell.className = 'fcell' + (k === center ? ' active' : '');
-    cell.dataset.pos = String(k);
-    const img = document.createElement('img');
-    img.decoding = 'async';
-    img.loading = 'lazy';
-    img.alt = '';
-    cell.appendChild(img);
-    const cap = document.createElement('span');
-    cap.className = 'fcap';
-    cap.textContent = String(k + 1);
-    cell.appendChild(cap);
-    frag.appendChild(cell);
-    ensureFilmstripThumb(gi).then((u) => { if (u && filmstripOn) img.src = u; });
-  }
-  viewerFilmstrip.innerHTML = "";
-  viewerFilmstrip.appendChild(frag);
-  for (const [gi, u] of Array.from(filmstripUrls.entries())) {
-    if (!wanted.has(gi)) {
-      try { URL.revokeObjectURL(u); } catch (_) {}
-      filmstripUrls.delete(gi);
+  if (!view.length) {
+    for (const [, node] of fsMounted) {
+      if (node.parentNode) node.parentNode.removeChild(node);
+      resetFsCell(node);
+      if (fsPool.length < 60) fsPool.push(node);
     }
+    fsMounted.clear();
+    if (fsTrackEl) fsTrackEl.style.width = '0px';
+    updateFsNavVisibility();
+    return;
   }
-  const active = viewerFilmstrip.querySelector('.fcell.active');
-  if (active) {
-    const stripW = viewerFilmstrip.clientWidth;
-    viewerFilmstrip.scrollLeft = Math.max(0, active.offsetLeft - stripW / 2 + active.offsetWidth / 2);
-  }
+  ensureFsTrack();
+  fsTrackEl.style.width = fsTrackWidth() + "px";
+  scrollFilmstripToActive('auto');
+  renderFilmstripVisible();
 }
-function toggleFilmstrip(on) {
-  filmstripOn = (typeof on === 'boolean') ? on : !filmstripOn;
+
+function toggleFilmstrip(on, userAction) {
+  const next = (typeof on === 'boolean') ? on : !filmstripOn;
+  filmstripOn = next;
+  if (userAction) _userClosedFilmstrip = !next;
   viewer.classList.toggle('showFilmstrip', filmstripOn);
   filmstripBtn.classList.toggle('on', filmstripOn);
-  if (filmstripOn) renderFilmstrip();
-  else { revokeAllFilmstripUrls(); viewerFilmstrip.innerHTML = ""; }
+  if (filmstripOn) {
+    renderFilmstrip();
+    schedulePrefetchFilmstrip();
+  } else {
+    for (const [, node] of fsMounted) {
+      if (node.parentNode) node.parentNode.removeChild(node);
+      resetFsCell(node);
+      if (fsPool.length < 60) fsPool.push(node);
+    }
+    fsMounted.clear();
+    revokeAllFilmstripUrls();
+    if (fsTrackEl) fsTrackEl.style.width = '0px';
+    updateFsNavVisibility();
+  }
 }
 
 async function openViewer(i, viewPos) {
   if (!hasViewerCanvas || !isValidIndex(i)) return;
+  // Invalidate any in-flight decode from a previous open so its late result
+  // can't paint the old bitmap over the new one.
+  activeReqId = ++decodeReqId;
   hideImgOverlay();
+  closeBitmap(bmp); bmp = null; bmpW = 1; bmpH = 1;
   currentIndex = i;
   currentViewPos = (typeof viewPos === 'number') ? viewPos : view.indexOf(i);
   if (currentViewPos < 0) currentViewPos = 0;
@@ -3282,9 +3546,14 @@ async function openViewer(i, viewPos) {
   const total = view.length || files.length;
   viewerTitle.textContent = `${currentViewPos + 1} / ${total} — ${path}`;
   viewerDims.textContent = fmtDims(dims[i] || null);
+  if (typeof fsPanelRefreshTitle === 'function') fsPanelRefreshTitle();
+  const wasOpen = viewer.classList.contains('open');
   viewer.classList.add('open');
   viewer.setAttribute('aria-hidden', 'false');
   lockScroll();
+  // Filmstrip on by default: first open of a viewer session enables it. If the
+  // user explicitly toggled it off during the session, respect that.
+  if (!wasOpen && !filmstripOn && !_userClosedFilmstrip) toggleFilmstrip(true);
   requestAnimationFrame(() => drawViewer());
   isFullRes = false;
   updateViewerButtons(i);
@@ -3307,12 +3576,22 @@ async function openViewer(i, viewPos) {
   currentPromptIdx = 0;
   const keepPanel = showingPromptPanel;
   loadAndShowPrompts(i, keepPanel);
-  if (filmstripOn) renderFilmstrip();
+  if (filmstripOn) {
+    // Cheap in-place update: retarget active + scroll. Virtualizer mounts new
+    // cells and idles the ones scrolled off.
+    for (const [k, node] of fsMounted) node.classList.toggle('active', k === currentViewPos);
+    scrollFilmstripToActive('smooth');
+    renderFilmstripVisible();
+    schedulePrefetchFilmstrip();
+  }
   refreshStatus();
 }
 function closeViewer() {
   stopSlideshow();
   if (filmstripOn) toggleFilmstrip(false);
+  // Fresh session next time — user's implicit off-during-session doesn't carry.
+  _userClosedFilmstrip = false;
+  setFullscreen(false);
   hideImgOverlay();
   viewer.classList.remove('open','loading','showPrompt');
   viewer.setAttribute('aria-hidden', 'true');
@@ -3325,6 +3604,10 @@ function closeViewer() {
   currentIndex = -1;
   showingPromptPanel = false;
   document.documentElement.style.setProperty('--promptH', '0px');
+  // Grid was under a fixed overlay; some tiles may have skipped paint due to
+  // content-visibility. Kick a re-render so mounted tiles + shimmer show up
+  // immediately, and any tile whose thumb was still queued keeps its loader.
+  if (files.length) onScrollOrResize();
   refreshStatus();
 }
 function nextInView() {
@@ -3364,7 +3647,7 @@ slideshowBtn.addEventListener('click', (e) => {
 });
 filmstripBtn.addEventListener('click', (e) => {
   e.preventDefault(); e.stopPropagation();
-  toggleFilmstrip();
+  toggleFilmstrip(undefined, true);
 });
 viewerFilmstrip.addEventListener('click', (e) => {
   const cell = e.target.closest('.fcell');
@@ -3376,9 +3659,142 @@ viewerFilmstrip.addEventListener('click', (e) => {
     openViewer(view[p], p);
   }
 });
+let _fsScrollRaf = 0;
+viewerFilmstrip.addEventListener('scroll', () => {
+  if (_fsScrollRaf) return;
+  _fsScrollRaf = requestAnimationFrame(() => {
+    _fsScrollRaf = 0;
+    if (!filmstripOn) return;
+    renderFilmstripVisible();
+    schedulePrefetchFilmstrip();
+  });
+}, { passive: true });
+
+function nudgeFilmstrip(dir) {
+  if (!filmstripOn) return;
+  const stripW = viewerFilmstrip.clientWidth || 0;
+  const step = Math.max(stepPx(), Math.floor(stripW * 0.8));
+  viewerFilmstrip.scrollLeft = (viewerFilmstrip.scrollLeft || 0) + (dir < 0 ? -step : step);
+}
+fsStripPrev.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); nudgeFilmstrip(-1); });
+fsStripNext.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); nudgeFilmstrip(1); });
+
+// Filmstrip prefetch: while open, spend idle time warming thumbs for cells
+// just outside the current viewport so scrolls reveal loaded images, not
+// shimmer. Bounded by the 8-slot shim queue so grid tiles still get served.
+let _fsPrefetchTimer = 0;
+function schedulePrefetchFilmstrip() {
+  if (!filmstripOn) return;
+  if (_fsPrefetchTimer) return;
+  _fsPrefetchTimer = setTimeout(runFilmstripPrefetch, 40);
+}
+function runFilmstripPrefetch() {
+  _fsPrefetchTimer = 0;
+  if (!filmstripOn || !view.length) return;
+  const { from, to } = fsVisibleRange();
+  const radius = 40; // one screenful of cells at typical widths
+  const lo = Math.max(0, from - radius);
+  const hi = Math.min(view.length - 1, to + radius);
+  const centerK = Math.max(from, Math.min(to, currentViewPos));
+  const order = [];
+  for (let off = 0; off <= Math.max(centerK - lo, hi - centerK); off++) {
+    if (centerK - off >= lo) order.push(centerK - off);
+    if (centerK + off <= hi && off !== 0) order.push(centerK + off);
+  }
+  const CONCURRENT = 6;
+  let inflight = 0, i = 0;
+  const step = () => {
+    while (inflight < CONCURRENT && i < order.length) {
+      const k = order[i++];
+      const gi = view[k];
+      if (filmstripUrls.has(gi) || filmstripPending.has(gi)) continue;
+      inflight++;
+      ensureFilmstripThumb(gi).finally(() => {
+        inflight--;
+        // Re-mount if a currently-mounted cell was waiting on this URL.
+        const node = fsMounted.get(k);
+        if (node) loadFsCellImg(node, gi);
+        if (filmstripOn) step();
+      });
+    }
+  };
+  step();
+}
 updateSlideshowBtn();
 updateShuffleBtn();
 viewerFav.addEventListener('click', toggleFavForCurrent);
+
+// Fullscreen mode: hide top bar, hide filmstrip, gather controls behind a
+// menu button. The top-bar and menu share the SAME button elements via DOM
+// re-parenting — no duplicated handlers, no state sync.
+let fullscreenOn = false;
+let _origTopActions = null; // Element that owned the toolbar rows before we moved them
+function fsPanelRefreshTitle() {
+  if (!fullscreenOn) return;
+  if (!isValidIndex(currentIndex)) { fsPanelTitle.textContent = ''; return; }
+  const path = files[currentIndex].path || files[currentIndex].name;
+  const total = view.length || files.length;
+  fsPanelTitle.textContent = `${currentViewPos + 1} / ${total} — ${path}`;
+}
+function movePanelContents(toPanel) {
+  const topActions = document.querySelector('#viewer .top .topActions');
+  if (toPanel) {
+    if (_origTopActions) return; // already moved
+    _origTopActions = topActions;
+    // Move each vGroup (and any children) into fsPanelRows.
+    const rows = topActions.querySelectorAll('.vGroup');
+    fsPanelRows.innerHTML = '';
+    rows.forEach(g => fsPanelRows.appendChild(g));
+  } else {
+    if (!_origTopActions) return;
+    const rows = fsPanelRows.querySelectorAll('.vGroup');
+    rows.forEach(g => _origTopActions.appendChild(g));
+    _origTopActions = null;
+    fsPanelRows.innerHTML = '';
+  }
+}
+function setFullscreen(on) {
+  const next = !!on;
+  if (next === fullscreenOn) return;
+  fullscreenOn = next;
+  viewer.classList.toggle('fullscreen', fullscreenOn);
+  if (fullscreenOn) {
+    // Save + apply: turn filmstrip off (no user-flag flip so re-open restores),
+    // move controls into the collapsible panel, refresh title.
+    movePanelContents(true);
+    fsPanelRefreshTitle();
+    // Update button label
+    viewerFullscreen.textContent = '⛶';
+  } else {
+    fsPanel.classList.remove('open');
+    movePanelContents(false);
+    viewerFullscreen.textContent = '⛶';
+  }
+  // Recompute base scale — stage inset changes.
+  if (viewer.classList.contains('open')) {
+    baseScale = computeBaseScale();
+    drawViewer();
+  }
+}
+viewerFullscreen.addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  setFullscreen(!fullscreenOn);
+});
+fsMenuBtn.addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  fsPanel.classList.toggle('open');
+});
+// Stop stage from taking pointerdown while interacting with the menu.
+fsMenu.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+fsMenu.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: true });
+// Click outside panel closes it. Use capture to run before the stage's
+// pointerdown/click handlers that stop propagation.
+viewer.addEventListener('pointerdown', (e) => {
+  if (!fullscreenOn) return;
+  if (!fsPanel.classList.contains('open')) return;
+  if (fsPanel.contains(e.target) || fsMenuBtn.contains(e.target)) return;
+  fsPanel.classList.remove('open');
+}, true);
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; }
   catch (_) {
@@ -3525,9 +3941,12 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (slideshowTimer) { stopSlideshow(); return; }
     if (shortcutsEl.style.display === 'block') { shortcutsEl.style.display = 'none'; return; }
+    if (fsPanel && fsPanel.classList.contains('open')) { fsPanel.classList.remove('open'); return; }
+    if (fullscreenOn) { setFullscreen(false); return; }
     if (showingPromptPanel) { showPromptPanel(false); return; }
     closeViewer(); return;
   }
+  if (e.key === 'z' || e.key === 'Z') { setFullscreen(!fullscreenOn); e.preventDefault(); return; }
   if (e.key === 'p' || e.key === 'P') { viewerPrompt.click(); return; }
   if (e.key === 'f' || e.key === 'F') { toggleFavForCurrent(); return; }
   if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
@@ -3536,7 +3955,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 's' || e.key === 'S') { toggleSlideshow(); e.preventDefault(); return; }
-  if (e.key === 't' || e.key === 'T') { toggleFilmstrip(); e.preventDefault(); return; }
+  if (e.key === 't' || e.key === 'T') { toggleFilmstrip(undefined, true); e.preventDefault(); return; }
   if (e.key === '+' || e.key === '=') {
     const r = stageRect();
     zoomAt(r.left + r.w / 2, r.top + r.h / 2, 1.25);
@@ -4612,14 +5031,23 @@ async function handleFgBootOpen(payload) {
   if (typeof window.__fgOpenPathAsRoot !== 'function') return; // browser build
   try {
     // If the same root is already open, skip re-scan and just re-target the viewer.
+    // Match on absolute path when available (name alone can collide across drives).
+    const norm = (s) => String(s || '').replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase();
+    const wantPath = norm(payload.root);
     const wantName = payload.root.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
-    const rootStillOpen = currentRootHandle && (currentRootHandle.name || '') === wantName && files.length;
+    const rootAbs = norm(currentRootHandle && currentRootHandle.absPath);
+    const nameMatches = currentRootHandle && (currentRootHandle.name || '') === wantName;
+    const rootStillOpen = files.length && (rootAbs ? rootAbs === wantPath : nameMatches);
     _pendingOpenName = payload.file || '';
     if (rootStillOpen) {
+      // Force any currently-open viewer to close first so the new file decode
+      // isn't racing against stale bitmap/overlay state from the previous open.
+      if (viewer.classList.contains('open')) closeViewer();
       maybeAutoOpenFromBoot();
       return;
     }
     reopenBanner.style.display = 'none';
+    if (viewer.classList.contains('open')) closeViewer();
     const handle = await window.__fgOpenPathAsRoot(payload.root);
     if (!handle) { _pendingOpenName = ''; return; }
     // Native handles are not structured-cloneable; skip IDB persistence.
