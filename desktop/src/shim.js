@@ -277,6 +277,34 @@
     return invoke('fs_reveal', { rootId: handle._rootId, rel: handle._rel || '' });
   };
 
+  // ---------- Filesystem watch ----------
+  // Start / stop a recursive watch on a root. Rust emits fg://fs-change with
+  // { rootId } (debounced). We invalidate the dir listing cache for that root
+  // and dispatch a DOM event the gallery listens for.
+  window.__fgWatchStart = async function (rootId) {
+    if (!rootId) return;
+    try { await invoke('fs_watch_start', { rootId }); }
+    catch (err) { console.error('[fg-shim] fs_watch_start failed', err); }
+  };
+  window.__fgWatchStop = async function (rootId) {
+    if (!rootId) return;
+    try { await invoke('fs_watch_stop', { rootId }); }
+    catch (_) {}
+  };
+  function handleFsChange(payload) {
+    const rid = payload && payload.rootId;
+    if (!rid) return;
+    invalidateAllDirs(rid);
+    try {
+      window.dispatchEvent(new CustomEvent('fg-fs-change', { detail: { rootId: rid } }));
+    } catch (_) {}
+  }
+  if (window.__TAURI__ && window.__TAURI__.event) {
+    window.__TAURI__.event.listen('fg://fs-change', (e) => handleFsChange(e && e.payload));
+  } else if (core && core.event) {
+    try { core.event.listen('fg://fs-change', (e) => handleFsChange(e && e.payload)); } catch (_) {}
+  }
+
   // fast-gallery.html persists the last picked FSA handle in IndexedDB
   // (db: "fast_gallery", store: "handles", key: "last"). Those stored objects
   // are opaque browser handles from a prior session — they don't map to any

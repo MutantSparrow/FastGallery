@@ -4,7 +4,7 @@ mod assoc;
 
 use fs_commands::{
     fg_image_handler, fs_delete, fs_dims, fs_list, fs_list_dir, fs_open_root, fs_read_bytes,
-    fs_read_head, fs_reveal, fs_thumb, fs_write_bytes, FsState,
+    fs_read_head, fs_reveal, fs_thumb, fs_watch_start, fs_watch_stop, fs_write_bytes, FsState,
 };
 
 use std::path::{Path, PathBuf};
@@ -164,6 +164,8 @@ pub fn run() {
             fs_delete,
             fs_write_bytes,
             fs_reveal,
+            fs_watch_start,
+            fs_watch_stop,
             assoc_install,
             assoc_uninstall,
             assoc_status,

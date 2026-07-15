@@ -5336,6 +5336,12 @@ async function ensureRestDimsInBackground(startFrom) {
 }
 
 async function loadViaFSA(dirHandle) {
+  // If a watcher was running for a previous root, stop it before we swap.
+  if (currentRootHandle && currentRootHandle._rootId
+      && (!dirHandle || dirHandle._rootId !== currentRootHandle._rootId)
+      && typeof window.__fgWatchStop === 'function') {
+    try { window.__fgWatchStop(currentRootHandle._rootId); } catch (_) {}
+  }
   currentRootHandle = dirHandle;
   permissionLost = false;
   permBanner.style.display = "none";
@@ -5363,7 +5369,138 @@ async function loadViaFSA(dirHandle) {
   } else {
     walkToast.style.display = "none";
   }
+  // Start watching the new root for changes so add/remove/rename show up live.
+  if (dirHandle && dirHandle._rootId && typeof window.__fgWatchStart === 'function') {
+    try { window.__fgWatchStart(dirHandle._rootId); } catch (_) {}
+  }
 }
+
+// Live refresh: re-walk the currently-open root and merge changes into state
+// without losing selection, favorites, cached dims/prompts/colors, scroll
+// anchor, or an open viewer. Called on the fg-fs-change event debounced from
+// Rust's notify-based watcher, and coalesced here to avoid piling refreshes
+// during long copy operations.
+let _fgRefreshInFlight = false;
+let _fgRefreshQueued = false;
+async function refreshFilesFromRoot() {
+  if (!currentRootHandle) return;
+  if (_fgRefreshInFlight) { _fgRefreshQueued = true; return; }
+  _fgRefreshInFlight = true;
+  try {
+    // Snapshot state we want to preserve across the reset.
+    const prevSelectedPaths = new Set();
+    for (const idx of selected) {
+      if (isValidIndex(idx) && files[idx]) prevSelectedPaths.add(files[idx].path);
+    }
+    const openInViewer = viewer.classList.contains('open') && isValidIndex(currentIndex);
+    const viewerPath = openInViewer ? files[currentIndex].path : "";
+    // Save scroll anchor by path (index-based anchor is invalidated by rescan).
+    let anchorPath = "";
+    let anchorOffsetY = 0;
+    const scrollY = window.scrollY || 0;
+    const anchor = saveScrollAnchor();
+    if (anchor && files[anchor.index]) {
+      anchorPath = files[anchor.index].path;
+      anchorOffsetY = anchor.offsetY;
+    }
+    // Cached per-file data keyed by current path.
+    const prevDims    = new Map();
+    const prevPrompts = new Map();
+    const prevColors  = new Map();
+    for (let i = 0; i < files.length; i++) {
+      const p = files[i].path;
+      if (dims[i]    !== undefined) prevDims.set(p, dims[i]);
+      if (prompts[i] !== undefined) prevPrompts.set(p, prompts[i]);
+      if (colors[i]  !== undefined) prevColors.set(p, colors[i]);
+    }
+
+    // Re-walk. Reuse walkDirectoryFSA so browser + native paths converge.
+    resetSidecars();
+    const collected = [];
+    const stats = { walkErrors: 0 };
+    try {
+      await walkDirectoryFSA(currentRootHandle, (batch) => {
+        for (const e of batch) collected.push(e);
+      }, undefined, stats);
+    } catch (_) {}
+    collected.sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
+
+    // resetAndLoadFiles wipes selection + caches; capture the ones we want back.
+    const rootKeyPrev = "fsa:" + ((currentRootHandle && currentRootHandle.name) || "root");
+    await resetAndLoadFiles(collected, rootKeyPrev);
+
+    // Restore per-file caches by matching path.
+    for (let i = 0; i < files.length; i++) {
+      const p = files[i].path;
+      if (prevDims.has(p))    dims[i]    = prevDims.get(p);
+      if (prevPrompts.has(p)) prompts[i] = prevPrompts.get(p);
+      if (prevColors.has(p))  colors[i]  = prevColors.get(p);
+    }
+
+    // Restore selection.
+    if (prevSelectedPaths.size) {
+      for (let i = 0; i < files.length; i++) {
+        if (prevSelectedPaths.has(files[i].path)) selected.add(i);
+      }
+      updateSelectionUI();
+    }
+
+    // Restore viewer position if the same file still exists.
+    if (viewerPath) {
+      const newIdx = files.findIndex(f => f.path === viewerPath);
+      if (newIdx >= 0) {
+        const vpos = view.indexOf(newIdx);
+        if (vpos >= 0) {
+          currentIndex = newIdx;
+          currentViewPos = vpos;
+          const path = files[newIdx].path || files[newIdx].name;
+          const total = view.length || files.length;
+          viewerTitle.textContent = `${vpos + 1} / ${total} — ${path}`;
+          if (typeof fsPanelRefreshTitle === 'function') fsPanelRefreshTitle();
+        } else {
+          // Filtered out — close viewer rather than showing stale content.
+          closeViewer();
+        }
+      } else {
+        // Deleted underfoot.
+        closeViewer();
+      }
+    }
+
+    // Restore scroll anchor.
+    if (anchorPath) {
+      const newIdx = files.findIndex(f => f.path === anchorPath);
+      if (newIdx >= 0) {
+        const s = slots.find(sl => sl.index === newIdx);
+        if (s) window.scrollTo(0, Math.max(0, s.top - anchorOffsetY));
+        else  window.scrollTo(0, scrollY);
+      } else {
+        window.scrollTo(0, scrollY);
+      }
+    }
+    // Re-render filmstrip if the viewer is showing it, since view indices moved.
+    if (filmstripOn) renderFilmstripVisible();
+  } finally {
+    _fgRefreshInFlight = false;
+    if (_fgRefreshQueued) {
+      _fgRefreshQueued = false;
+      setTimeout(refreshFilesFromRoot, 0);
+    }
+  }
+}
+
+// Debounce fs-change bursts a tiny bit on top of Rust's own debounce — huge
+// copies still fire many events; batch them into at most one refresh per 400ms.
+let _fgFsChangeTimer = 0;
+window.addEventListener('fg-fs-change', (e) => {
+  const rid = e && e.detail && e.detail.rootId;
+  if (!rid || !currentRootHandle || currentRootHandle._rootId !== rid) return;
+  if (_fgFsChangeTimer) return;
+  _fgFsChangeTimer = setTimeout(() => {
+    _fgFsChangeTimer = 0;
+    refreshFilesFromRoot();
+  }, 400);
+});
 
 async function loadViaWebkitDirectory(fileList) {
   resetSidecars();

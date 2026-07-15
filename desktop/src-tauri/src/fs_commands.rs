@@ -7,20 +7,28 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, UNIX_EPOCH};
 
 use image::imageops::FilterType;
 use image::{ImageEncoder, ImageReader};
+use notify::{RecursiveMode, Watcher};
+use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, FileIdMap};
 use serde::Serialize;
 use sha1::{Digest, Sha1};
-use tauri::{command, AppHandle, Manager, State};
+use tauri::{command, AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use walkdir::WalkDir;
+
+pub struct WatchHandle {
+    _debouncer: Debouncer<notify::RecommendedWatcher, FileIdMap>,
+}
 
 #[derive(Default)]
 pub struct FsState {
     // root_id -> canonicalized absolute path
     inner: Mutex<HashMap<String, PathBuf>>,
+    // root_id -> live watcher handle (dropped on stop)
+    watchers: Mutex<HashMap<String, WatchHandle>>,
 }
 
 #[derive(Serialize)]
@@ -500,4 +508,65 @@ fn guess_mime(path: &str) -> &'static str {
     if lower.ends_with(".bmp") { return "image/bmp"; }
     if lower.ends_with(".html") || lower.ends_with(".htm") { return "text/html; charset=utf-8"; }
     "application/octet-stream"
+}
+
+// ------------- filesystem watcher -------------
+// Emits `fg://fs-change` with { rootId } whenever something under the root
+// changes. Debounced (300 ms) so a burst of writes coalesces into one JS-side
+// refresh. Errors are logged but never propagated — the watcher must not tear
+// the whole UI down on transient I/O hiccups.
+
+#[command]
+pub async fn fs_watch_start(
+    app: AppHandle,
+    state: State<'_, FsState>,
+    root_id: String,
+) -> Result<(), String> {
+    let root = root_for(&state, &root_id)?;
+    // Drop any previous watcher for this root so we don't leak listeners.
+    state.watchers.lock().unwrap().remove(&root_id);
+
+    let app_for_cb = app.clone();
+    let root_id_for_cb = root_id.clone();
+    let mut debouncer = new_debouncer(
+        Duration::from_millis(300),
+        None,
+        move |res: DebounceEventResult| {
+            match res {
+                Ok(_events) => {
+                    // We don't forward path lists — the JS side re-walks the
+                    // whole root and diffs. Cheaper on IPC, and it handles
+                    // rename-across-directory naturally.
+                    let _ = app_for_cb.emit(
+                        "fg://fs-change",
+                        serde_json::json!({ "rootId": root_id_for_cb.clone() }),
+                    );
+                }
+                Err(errs) => {
+                    for e in errs {
+                        eprintln!("[fg] fs watch error: {e:?}");
+                    }
+                }
+            }
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    debouncer
+        .watcher()
+        .watch(&root, RecursiveMode::Recursive)
+        .map_err(|e| e.to_string())?;
+
+    state
+        .watchers
+        .lock()
+        .unwrap()
+        .insert(root_id, WatchHandle { _debouncer: debouncer });
+    Ok(())
+}
+
+#[command]
+pub fn fs_watch_stop(state: State<'_, FsState>, root_id: String) -> Result<(), String> {
+    state.watchers.lock().unwrap().remove(&root_id);
+    Ok(())
 }
