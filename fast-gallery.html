@@ -3189,7 +3189,7 @@ function zoomAt(cx, cy, factor) {
   panX = dx - ix * newOverall;
   panY = dy - iy * newOverall;
   zoomS = newOverall / baseScale;
-  drawViewer();
+  scheduleDragDraw();
 }
 
 viewerStage.addEventListener('wheel', (e) => {
@@ -3197,6 +3197,11 @@ viewerStage.addEventListener('wheel', (e) => {
   e.preventDefault(); e.stopPropagation();
   zoomAt(e.clientX, e.clientY, Math.pow(1.0015, -e.deltaY));
 }, { passive:false });
+let _dragRaf = 0;
+function scheduleDragDraw() {
+  if (_dragRaf) return;
+  _dragRaf = requestAnimationFrame(() => { _dragRaf = 0; drawViewer(); });
+}
 viewerStage.addEventListener('pointerdown', (e) => {
   if (!viewer.classList.contains('open')) return;
   e.preventDefault(); e.stopPropagation();
@@ -3212,12 +3217,14 @@ viewerStage.addEventListener('pointermove', (e) => {
   e.preventDefault(); e.stopPropagation();
   panX = dragStartPanX + (e.clientX - dragStartX);
   panY = dragStartPanY + (e.clientY - dragStartY);
-  drawViewer();
+  scheduleDragDraw();
 });
 function endDrag(e) {
   if (!dragging) return;
   e.preventDefault(); e.stopPropagation();
   dragging = false; setZoomClasses();
+  if (_dragRaf) { cancelAnimationFrame(_dragRaf); _dragRaf = 0; }
+  drawViewer();
   try { viewerStage.releasePointerCapture(e.pointerId); } catch (_) {}
 }
 viewerStage.addEventListener('pointerup', endDrag);
