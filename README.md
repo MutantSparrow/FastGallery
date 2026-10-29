@@ -7,12 +7,20 @@ Local image browser. Two flavors from one codebase:
 
 Fast masonry gallery, canvas viewer, hierarchical folder navigation, prompt extraction (A1111 / ComfyUI / Fooocus `log.html` sidecars), delete, drag-and-drop.
 
+## Compact controls
+
+The gallery keeps Open folder, filename search, selection, and **Controls** in a compact toolbar. Open **Controls** for columns, metadata scans, sorting, filters, subfolder inclusion, and random browsing. The button shows the number of active filters even when the panel is closed. Selection downloads and deletion remain in the toolbar when items are selected.
+
+The viewer uses the same **Controls** panel in standard and fullscreen modes, with icon actions grouped into playback, image actions, and view options. Hover an icon for its label and shortcut. The orange **Gallery** button beside **Controls** returns to browsing. Click outside a panel to dismiss it, or press Escape to close it and return focus to its button.
+
 ## Features
 
-- **Masonry grid** — virtualized. Only visible tiles live in the DOM, so 10k+ folders scroll smoothly.
-- **Canvas viewer** — wheel zoom, drag pan, EXIF-oriented, downscaled preview by default with a `Full-res` button on demand, rotate, filmstrip, slideshow.
+- **Video hover previews** — hover over an MP4 or WebM tile to play a muted, looping preview. Leaving the tile restores its poster. Only one preview plays at a time; opening the viewer, scrolling, or leaving the app stops it. Click the tile for full playback controls.
+- **Masonry grid** — virtualized, with 1–12 columns. Visible thumbnails remain mounted as discovery updates the layout.
+- **Canvas viewer** — wheel zoom below fit size, drag pan with corners movable to viewport center, EXIF orientation, bounded preview by default with higher resolution on demand, rotation, optional filmstrip (closed initially), and slideshow with an editable 0.25–3600 second interval.
+- **Fullscreen** — native window fullscreen on desktop; browser fullscreen in the HTML app.
 - **Prev / next in viewer** — `←` / `→` walk the filtered order. Wraps.
-- **Hierarchical folder navigation** — breadcrumb path + subfolder chips. Drill down / up, `Recursive` toggle switches between "images in this folder only" and "images in the whole subtree".
+- **Hierarchical folder navigation** — breadcrumb path + subfolder chips. Drill down / up; `Include subfolders` starts off and can be enabled to browse the whole subtree.
 - **Drag-and-drop** — drop a folder (or images) anywhere on the window. Uses the File System Access API when available, falls back to the legacy Entries API.
 - **Delete** — trashcan button on tiles, `Delete` button in the viewer, `Delete selected` in multi-select. Confirm modal shows what will be removed. On FSA folders, files are permanently deleted from disk; otherwise they are removed from the gallery only.
 - **Sort** — name, date, size, width, height, area, random. Direction toggle.
@@ -25,12 +33,13 @@ Fast masonry gallery, canvas viewer, hierarchical folder navigation, prompt extr
   - favorites only
 - **Prompt extraction** — reads A1111 `parameters`, ComfyUI `prompt` graph, ComfyUI `workflow` (UI + API shapes), generic `prompt_*` PNG chunks, JPEG EXIF UserComment, and **Fooocus `log.html` sidecars** (per-folder). Cycles multiple prompts per image, copy to clipboard.
 - **Favorites** — star tiles or press `F` in the viewer. Persisted per-folder in IndexedDB.
-- **Copy path / folder** — `C` copies the image path, `Shift+C` copies the folder path (paste into Explorer's address bar to reveal).
+- **Copy image** — `C` / `Ctrl+C` copies source-sized PNG pixels without viewport bars, independently of zoom and pan. Still images up to 64 million pixels and a 16,384 px edge are supported; use Download original for larger sources.
+- **Copy path / folder** — `Alt+C` copies the image path, `Shift+C` copies the folder path (paste into Explorer's address bar to reveal).
 - **Reopen last folder** — File System Access API + IndexedDB. One click on load (Chrome/Edge).
 - **Fallback picker** — `<input webkitdirectory>` on Firefox and Safari. All features work; favorites become session-only.
 - **ZIP export** — select several tiles → `Download`. Writes an uncompressed ZIP in-browser. 512 MB cap.
 - **Loader feedback** — progress panel during folder scan and dimension reading.
-- **Formats** — PNG, JPEG, WebP, GIF, AVIF, BMP.
+- **Formats** — PNG, JPEG, WebP, GIF, AVIF, BMP, MP4 and WebM, subject to browser codec support. Native AVIF thumbnails/previews remain incomplete.
 
 ## Usage
 
@@ -51,14 +60,20 @@ Tauri 2 wrapper that eliminates browser sandbox friction. `desktop/` in the repo
 ### Extras vs. the plain HTML
 
 - Native folder picker — no FSA permission prompt.
-- Rust thumbnail service: downscaled JPEG thumbs with on-disk cache. Scroll a 30k-image folder smoothly, no `blob` OOM.
+- Rust thumbnail service: downscaled JPEG thumbs with on-disk cache. Heavy image decodes run one at a time, with viewer requests ahead of queued thumbnails.
 - Header-only dimension probe, header-only metadata read (2 MB slice). Prompt prefetch never ships pixels.
-- `createImageBitmap` fallback for very large images (`12k × 26k`, etc.): Rust decodes to a 2048px preview when Chromium refuses.
+- Large-image previews: supported large images are resized in Rust before entering the webview. Cached thumbnails appear while the larger preview loads; navigating away cancels queued work and discards obsolete results. Normal previews use at most 16 million pixels; the on-demand higher-resolution view is capped at 96 million pixels and a 16,384px edge.
 - Real absolute paths in `Copy path` / `Copy folder path`.
 - System tray, close-to-tray. Global shortcut `Ctrl+Alt+G` to toggle window.
 - Windows file association: `Open with Fast Gallery` on `.png/.jpg/.jpeg/.webp/.gif/.bmp/.avif` (Settings → Default apps → pick Fast Gallery to promote to default).
 - Single-instance forwarding: double-clicking a second image while the app is running jumps that window to the new file.
 - Dynamic tab title reflecting state (working, scanning, viewing, browsing).
+
+Background dimension, prompt, and color scans pause while the viewer is open. Large animated GIF/WebP files use a static preview to keep viewing within the pixel budget; smaller animations keep playing normally. Original files are unchanged. Native decoding still needs memory for the source image, so extremely large or unsupported files may show an unavailable-preview message.
+
+Regression checks: `node --test tests/*.test.cjs` from the repository root. See [working notes](docs/PROJECT_NOTES.md) for architecture and remaining audit items, [performance work](docs/PERFORMANCE_WORK.md) for native limits, and [usability work](docs/USABILITY_WORK.md) for the latest behavior and verification scope.
+
+The latest portable build and its checksum record are in `desktop/release/fast-gallery-v1.6.1-usability.exe` and its adjacent `.build.json`. Quit any running tray instance before launching a replacement executable. Older executables cannot read the upgraded favorites database; retaining an old EXE does not roll back that database.
 
 ### Build
 
@@ -97,7 +112,8 @@ Uninstall the associations from the tray menu.
 | `Shift+X` | Toggle shuffle slideshow |
 | `P` | Prompt panel |
 | `F` | Favorite |
-| `C` | Copy image path |
+| `C` / `Ctrl+C` | Copy image pixels |
+| `Alt+C` | Copy image path |
 | `Shift+C` | Copy folder path |
 | `+` / `-` | Zoom in / out |
 | `0` / `1` | Fit / 1:1 |

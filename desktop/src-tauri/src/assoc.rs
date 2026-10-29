@@ -18,7 +18,7 @@ const CAP_FA:  &str = r"Software\FastGallery\Capabilities\FileAssociations";
 const REG_APPS: &str = r"Software\RegisteredApplications";
 const CLASSES: &str = r"Software\Classes";
 
-const EXTS: &[&str] = &[".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif"];
+const EXTS: &[&str] = &[".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif", ".mp4", ".webm"];
 
 #[derive(Serialize)]
 pub struct AssocStatus {

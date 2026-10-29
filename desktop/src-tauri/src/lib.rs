@@ -4,7 +4,7 @@ mod assoc;
 
 use fs_commands::{
     fg_image_handler, fs_delete, fs_dims, fs_list, fs_list_dir, fs_open_root, fs_read_bytes,
-    fs_read_head, fs_reveal, fs_thumb, fs_watch_start, fs_watch_stop, fs_write_bytes, FsState,
+    fs_preview, fs_read_head, fs_reveal, fs_thumb, fs_watch_start, fs_watch_stop, FsState,
 };
 
 use std::path::{Path, PathBuf};
@@ -97,7 +97,7 @@ fn extract_image_arg(argv: &[String]) -> Option<PathBuf> {
 
 fn is_image_ext(p: &Path) -> bool {
     match p.extension().and_then(|s| s.to_str()).map(|s| s.to_ascii_lowercase()) {
-        Some(ext) => matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "avif"),
+        Some(ext) => matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "avif" | "mp4" | "webm"),
         None => false,
     }
 }
@@ -120,10 +120,19 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // Another instance was launched — forward argv to the running window.
-            show_or_focus(app);
             if let Some(img) = extract_image_arg(&argv) {
                 let payload = args_payload(&img);
-                let _ = app.emit("fg://open-args", payload);
+                if let Some(win) = app.get_webview_window("main") {
+                    // Present only after the frontend has cleared the old target.
+                    let _ = win.hide();
+                    let js = format!(
+                        "window.__FG_INITIAL_ARGS__ = {}; window.dispatchEvent(new CustomEvent('fg-boot-open', {{detail: window.__FG_INITIAL_ARGS__}}));",
+                        payload
+                    );
+                    if win.eval(&js).is_err() { show_or_focus(app); }
+                }
+            } else {
+                show_or_focus(app);
             }
         }))
         .plugin(tauri_plugin_dialog::init())
@@ -160,9 +169,9 @@ pub fn run() {
             fs_read_bytes,
             fs_read_head,
             fs_thumb,
+            fs_preview,
             fs_dims,
             fs_delete,
-            fs_write_bytes,
             fs_reveal,
             fs_watch_start,
             fs_watch_stop,

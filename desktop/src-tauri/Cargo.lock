@@ -1127,7 +1127,7 @@ dependencies = [
 
 [[package]]
 name = "fast-gallery"
-version = "1.5.1"
+version = "1.6.1"
 dependencies = [
  "image",
  "notify",

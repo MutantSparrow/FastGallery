@@ -15,6 +15,13 @@
     ? core.convertFileSrc.bind(core)
     : ((p) => `http://asset.localhost/${encodeURIComponent(p)}`);
   window.__FG_NATIVE__ = true;
+  window.__fgPresent = async function () {
+    const win = window.__TAURI__?.window?.getCurrentWindow();
+    if (!win) return;
+    await win.show();
+    await win.unminimize();
+    await win.setFocus();
+  };
   // Public helper: turn an absolute OS path into a URL <img>/<video> can load
   // directly via Tauri's asset protocol. Bytes never enter the JS heap.
   window.__fgAssetUrl = function (absPath) {
@@ -26,28 +33,36 @@
   // Rust (with on-disk cache). Returns an object-URL that the caller must
   // revoke when done. Bytes flow through IPC once, thumbnails are tiny.
   //
-  // Concurrency-limited queue prevents 30k concurrent decodes when the user
-  // scrolls a large folder fast. 8 parallel decodes matches typical CPU.
-  const THUMB_CONC = 8;
+  // Output size says nothing about source decode memory. Run one heavy decode
+  // at a time; viewer requests jump ahead of queued background thumbnails.
+  const THUMB_CONC = 1;
   let thumbActive = 0;
+  let completedDecodes = 0, lastDecodeMs = 0;
   const thumbQueue = [];
   function drainThumbQueue() {
     while (thumbActive < THUMB_CONC && thumbQueue.length) {
       const job = thumbQueue.shift();
+      if (job.signal?.aborted) { job.resolve(""); continue; }
       thumbActive++;
-      invoke('fs_thumb', { rootId: job.rootId, rel: job.rel, max: job.max })
+      job.started = true;
+      const startedAt = Date.now();
+      invoke(job.command, job.args)
         .then((bytes) => {
+          if (job.signal?.aborted) { job.resolve(""); return; }
           const buf = bytes instanceof ArrayBuffer ? bytes
                     : ArrayBuffer.isView(bytes) ? bytes.buffer
                     : new Uint8Array(bytes).buffer;
-          const blob = new Blob([buf], { type: 'image/jpeg' });
+          const blob = new Blob([buf], { type: job.mime });
           job.resolve(URL.createObjectURL(blob));
         })
-        .catch((err) => {
-          console.error('[fg-shim] fs_thumb failed', job.rel, err);
+        .catch(() => {
           job.resolve("");
         })
-        .finally(() => { thumbActive--; drainThumbQueue(); });
+        .finally(() => {
+          completedDecodes++; lastDecodeMs = Date.now() - startedAt;
+          job.signal?.removeEventListener('abort', job.onAbort);
+          thumbActive--; drainThumbQueue();
+        });
     }
   }
   // Read only the first N bytes of a file. Returns an ArrayBuffer. Used by
@@ -77,21 +92,37 @@
     } catch (_) { return null; }
   };
 
-  window.__fgThumbUrl = function (rootId, rel, max) {
-    if (!rootId || !rel) return Promise.resolve("");
+  function queueImage(command, args, mime, options = {}) {
+    if (options.signal?.aborted) return Promise.resolve("");
     return new Promise((resolve) => {
-      thumbQueue.push({ rootId, rel, max: max | 0, resolve });
+      const job = { command, args, mime, resolve, signal:options.signal, started:false };
+      job.onAbort = () => {
+        if (!job.started) {
+          const index = thumbQueue.indexOf(job);
+          if (index >= 0) thumbQueue.splice(index, 1);
+          job.signal.removeEventListener('abort', job.onAbort);
+          resolve("");
+        }
+      };
+      job.signal?.addEventListener('abort', job.onAbort, { once:true });
+      if (options.priority) thumbQueue.unshift(job);
+      else thumbQueue.push(job);
       drainThumbQueue();
     });
+  }
+  window.__fgThumbUrl = function (rootId, rel, max, options) {
+    if (!rootId || !rel) return Promise.resolve("");
+    return queueImage('fs_thumb', { rootId, rel, max:max | 0 }, 'image/jpeg', options);
   };
-  // If a caller (e.g. after fast scroll) no longer needs a queued thumb,
-  // let them cancel by tag. Simple: replace on next call for same tile.
-  window.__fgThumbCancel = function () {
-    // Not implemented granularly — we rely on tile index guards in the caller.
+  window.__fgPreviewUrl = function (rootId, rel, maxEdge, maxPixels, options = {}) {
+    if (!rootId || !rel) return Promise.resolve("");
+    return queueImage('fs_preview', { rootId, rel, maxEdge, maxPixels }, 'image/png', { ...options, priority:true });
   };
+  // Numeric diagnostics only: never expose filenames/paths in performance data.
+  window.__fgDecodeStats = () => ({ active:thumbActive, queued:thumbQueue.length, completed:completedDecodes, lastDecodeMs });
 
   // Match the extension filter Fast Gallery already uses (see IMAGE_EXT_RE).
-  const IMG_RE = /\.(png|jpe?g|webp|gif|avif|bmp)$/i;
+  const IMG_RE = /\.(png|jpe?g|webp|gif|avif|bmp|mp4|webm)$/i;
   const LOG_RE = /^log\.html?$/i;
 
   // Per-directory listing cache: Map<`${rootId}:${rel}`, Entry[]>.
@@ -305,23 +336,8 @@
     try { core.event.listen('fg://fs-change', (e) => handleFsChange(e && e.payload)); } catch (_) {}
   }
 
-  // fast-gallery.html persists the last picked FSA handle in IndexedDB
-  // (db: "fast_gallery", store: "handles", key: "last"). Those stored objects
-  // are opaque browser handles from a prior session — they don't map to any
-  // native root here. Clear just that entry on cold start so the "Reopen last
-  // folder" banner never tries to iterate a stale handle. Favorites (separate
-  // store in the same db) are preserved.
-  try {
-    const openReq = indexedDB.open('fast_gallery', 1);
-    openReq.onsuccess = () => {
-      const db = openReq.result;
-      try {
-        const tx = db.transaction('handles', 'readwrite');
-        tx.objectStore('handles').delete('last');
-        tx.oncomplete = () => db.close();
-      } catch (_) { db.close(); }
-    };
-  } catch (_) {}
+  // The gallery owns IndexedDB initialization. A second opener here used to
+  // create an empty v1 database before the gallery could create its stores.
 
   console.log('[fg-shim] native FSA bridge ready');
 })();

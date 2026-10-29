@@ -560,6 +560,27 @@
   }
   .tile[data-folder]:not([data-folder=""]) .fchip{ display:block; }
 
+  /* Video play badge — centered, shown only on video tiles */
+  .vplay{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:44px; height:44px; border-radius:50%;
+    background:rgba(10,10,10,.55);
+    border:1px solid rgba(255,255,255,.4);
+    color:rgba(255,255,255,.92);
+    display:none; place-items:center;
+    font-size:16px; padding-left:3px; line-height:1;
+    pointer-events:none; user-select:none;
+    text-shadow:0 1px 3px rgba(0,0,0,.8);
+  }
+  .tile[data-video="1"] .vplay{ display:grid; }
+  .tile .hoverVideo{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+    pointer-events:none; opacity:0;
+  }
+  .tile.previewing .hoverVideo{opacity:1}
+  .tile.previewing .vplay{display:none}
+
+
   /* Star (favorites) — square, mono, unified with tile actions */
   .star{
     position:absolute; right:6px; top:6px;
@@ -764,7 +785,7 @@
   body.dropping #empty{ background:var(--signal-wash); }
 
   /* -------- Banners & toasts -------- */
-  #reopenBanner, #permBanner{
+  #reopenBanner, #permBanner, #legacyFavoritesBanner{
     padding:10px 14px; margin:0;
     background:var(--paper-2);
     border-top:1px solid var(--rule);
@@ -775,7 +796,9 @@
     font:12px/1 var(--font-ui);
   }
   #permBanner{ border-left-color:var(--danger); }
-  #walkToast, #quotaToast, #folderToast{
+  #legacyFavoritesBanner{line-height:1.5; flex-wrap:wrap}
+  #legacyFavoritesText{flex:1 1 280px}
+  #walkToast, #quotaToast, #folderToast, #deleteToast{
     display:none; align-items:center; gap:12px;
     padding:8px 14px; margin:0;
     background:var(--paper-2);
@@ -786,6 +809,13 @@
     font:12px/1 var(--font-ui); color:var(--fg-dim);
   }
   #folderToast{ border-left-color:var(--signal); }
+  #deleteToast{
+    position:fixed; left:12px; bottom:12px; max-width:min(720px, calc(100vw - 24px));
+    z-index:10000; line-height:1.5; border-left-color:var(--signal);
+    box-shadow:0 8px 24px #0009;
+  }
+  #deleteToast[data-state="error"]{border-left-color:var(--danger)}
+  #deleteToastClose{flex:0 0 auto}
   #folderToast .meta{
     flex:1 1 auto; overflow:hidden; text-overflow:ellipsis;
     font:12px/1 var(--font-mono); color:var(--fg);
@@ -909,6 +939,14 @@
     display:none;
     background:#000;
     user-select:none;
+  }
+  #viewer #viewerVideoOverlay{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:contain;
+    display:none;
+    background:#000;
+    z-index:2;              /* above canvas; controls stay clickable */
   }
   #viewer .filmstripWrap{
     position:absolute; left:0; right:0; bottom:0;
@@ -1064,6 +1102,80 @@
     display:inline-block; margin-right:8px;
     color:var(--signal);
   }
+
+  /* Compact controls shared by the gallery and viewer. */
+  :root{--barH:49px; --tap:30px}
+  .btn, #viewer button.vBtn, .folderMore, .crumb, .folderChip,
+  #promptPanel .pnav button, #promptPanel .pact button,
+  .ctrl label, .toggle .tlabel{letter-spacing:0; text-transform:none; font-size:12px}
+  button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--signal); outline-offset:2px;
+  }
+  #row1{padding:8px 12px; gap:8px}
+  #row1 > .divider{display:none}
+  #fnQuery{width:clamp(120px, 20vw, 280px); min-width:100px}
+  #galleryControls[hidden]{display:none}
+  #galleryControls{
+    position:absolute; right:12px; top:calc(100% + 6px); width:min(560px, calc(100vw - 24px));
+    max-height:calc(100dvh - var(--barH) - 20px); overflow:auto;
+    padding:16px; background:var(--paper-2); border:1px solid var(--rule-strong);
+    box-shadow:0 12px 40px #0009; -webkit-app-region:no-drag;
+  }
+  .panelHeading{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px}
+  .settingsRow{display:flex; flex-wrap:wrap; gap:8px; padding-bottom:14px; border-bottom:1px solid var(--rule)}
+  #galleryControls #row2{padding:14px 0 0; gap:8px; border:0}
+  #row2 > .eyebrow{flex-basis:100%; margin:6px 0}
+  #row2 > .divider, #row2 > .spacer{display:none}
+  #row2 #kwQuery{flex:1 1 100%; width:100%}
+  #row2 .fmtWrap, #row2 .colorStrip{flex-basis:100%; flex-wrap:wrap}
+  #row2 #resetFilters{margin-left:auto}
+  #viewer .top{height:48px; padding:8px 12px; padding-right:120px}
+  #viewer .topActions{display:none}
+  #viewer .stage{inset:48px 0 0}
+  #viewer .fsMenu{display:flex; top:8px; right:12px; flex-direction:row; align-items:center}
+  #viewer .fsMenuBtn{width:auto; height:32px; padding:0 12px; font:600 12px/1 var(--font-ui)}
+  #viewer .fsMenu > .winCtl{display:none}
+  body.fg-native #viewer .fsMenu > .winCtl{display:flex; order:2}
+  body.fg-native #viewer .top{padding-right:270px}
+  #viewer .fsPanel{
+    position:absolute; right:0; top:40px; width:360px;
+    max-width:calc(100vw - 24px); max-height:calc(100dvh - 64px); padding:14px;
+    box-shadow:0 12px 40px #0009;
+  }
+  #viewer .fsPanel .vGroup{display:flex; flex-wrap:wrap; gap:6px; padding:10px 0; border:0; border-bottom:1px solid var(--rule); background:none}
+  #viewer .fsPanel .vGroup::before{content:attr(data-label); flex-basis:100%; color:var(--fg-dim); font:600 11px/1.4 var(--font-ui); margin-bottom:4px}
+  #viewer .fsPanel .vGroup:last-child{border-bottom:0}
+  #shortcuts{min-width:0; width:min(520px, calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow:auto; padding:18px}
+  #shortcuts td{padding:4px 8px}
+  [hidden]{display:none !important}
+  #viewer .galleryReturn{color:var(--signal-fg);border-color:var(--signal);background:var(--signal-wash)}
+  body.fg-native #viewer .top{padding-right:360px}
+  #viewer .topLeft{min-width:0;flex:1}
+  #viewer .top{padding-right:190px}
+  #viewer button.vBtn.iconAction, .btn.iconAction{width:34px;min-width:34px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+  .iconAction svg{width:17px;height:17px;pointer-events:none}
+  #viewer .fsPanel{width:360px;max-width:calc(100vw - 24px)}
+  #viewer .fsPanel .panelHeading{margin-bottom:10px}
+  #viewer .fsPanel .vGroup{gap:8px}
+  .slideshowSpeed{display:inline-flex;align-items:center;gap:5px;font:12px var(--font-mono);color:var(--fg-dim)}
+  #slideshowSeconds{width:76px;height:32px;padding:4px 6px;font:12px var(--font-mono);background:var(--paper);color:var(--fg);border:1px solid var(--rule)}
+  .settingsRow{display:grid;grid-template-columns:1fr;gap:8px}
+  .settingsRow .ctrl{width:100%}.settingsRow .ctrl input[type=range]{flex:1;width:auto}
+  #pfSwitch,#pcSwitch{display:grid;grid-template-columns:1fr 30px 90px;gap:10px;width:100%;height:46px;position:relative;padding-bottom:14px}
+  #pfProg,#pcProg{grid-column:3;text-align:right;font-size:10px}
+  #pfEst{position:absolute;left:0;bottom:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+  .actionNotice{position:fixed;bottom:12px;left:12px;z-index:12000;max-width:calc(100vw - 24px);padding:10px 14px;background:var(--paper-2);border:1px solid var(--rule);border-left:2px solid var(--signal);font:12px/1.5 var(--font-ui);color:var(--fg)}
+  .imageContext{position:fixed;z-index:11000;padding:6px;background:var(--paper-2);border:1px solid var(--rule-strong);box-shadow:0 8px 30px #000a;display:grid;gap:4px;min-width:180px}
+  .imageContext button{text-align:left;justify-content:flex-start}
+  #viewer.fullscreen .winCtl{display:none !important}
+  #viewer .stage{cursor:grab}#viewer.dragging .stage{cursor:grabbing}
+  #viewer .stage button,#viewer .stage input,#viewer .stage select{cursor:pointer}
+  @media(max-width:600px){
+    #row1{gap:6px} #row1 .spacer{display:none} #count{margin-right:auto}
+    #fnQuery{order:3; flex:1 1 100%; width:100%}
+    #row1 #viewCountWrap{display:none !important} #row1 .winCtl{margin-left:0} .folderRow{padding:6px 12px}
+    #viewer .vdims{display:none} #promptPanel .phdr{gap:6px; flex-wrap:wrap}
+  }
 </style>
 </head>
 <body class="nofiles">
@@ -1076,32 +1188,14 @@
     <div id="viewCountWrap" class="meta" style="display:none"><span id="viewCount">0</span> shown</div>
     <div id="selCount" class="meta" style="display:none">0 selected</div>
 
+    <input id="fnQuery" type="search" placeholder="Filename" title="Filter by filename (substring match)" />
     <div class="spacer"></div>
-
-    <div class="ctrl" title="Column count">
-      <label for="colSlider">Cols</label>
-      <input id="colSlider" type="range" min="1" max="12" step="1" value="4" />
-      <div id="colVal" class="val">4</div>
-    </div>
 
     <div id="msSwitch" class="toggle" role="switch" aria-checked="false" tabindex="0" title="Multi-select (M)">
       <span class="tlabel">Select</span>
       <span class="switch"><span class="knob"></span></span>
     </div>
-
-    <div id="pfSwitch" class="toggle" role="switch" aria-checked="false" tabindex="0" title="Scan every image for prompt metadata">
-      <span class="tlabel">Prompts</span>
-      <span class="switch"><span class="knob"></span></span>
-      <div id="pfProg" class="meta" style="display:none">0 / 0</div>
-      <div id="pfEst" class="meta" style="display:none"></div>
-    </div>
-
-    <div id="pcSwitch" class="toggle" role="switch" aria-checked="false" tabindex="0" title="Scan every image for a dominant color signature">
-      <span class="tlabel">Colors</span>
-      <span class="switch"><span class="knob"></span></span>
-      <div id="pcProg" class="meta" style="display:none">0 / 0</div>
-    </div>
-
+    <button id="galleryControlsBtn" class="btn" aria-expanded="false" aria-controls="galleryControls">Controls</button>
     <div class="divider"></div>
 
     <button id="dlAllBtn" class="btn" style="display:none" title="Download selected images as a ZIP">Download</button>
@@ -1114,7 +1208,31 @@
     </div>
   </div>
 
-  <div class="row" id="row2" data-tauri-drag-region>
+  <section id="galleryControls" aria-label="Gallery controls" hidden>
+    <div class="panelHeading"><strong>Gallery controls</strong><button id="galleryControlsClose" class="btn ghost" type="button">Close</button></div>
+    <div class="settingsRow" aria-label="Display and scanning">    <div class="ctrl" title="Column count">
+      <label for="colSlider">Columns</label>
+      <input id="colSlider" type="range" min="1" max="12" step="1" value="4" />
+      <div id="colVal" class="val">4</div>
+    </div>
+
+
+
+    <div id="pfSwitch" class="toggle" role="switch" aria-checked="false" tabindex="0" title="Scan every image for prompt metadata">
+      <span class="tlabel">Scan prompts</span>
+      <span class="switch"><span class="knob"></span></span>
+      <div id="pfProg" class="meta" style="display:none">0 / 0</div>
+      <div id="pfEst" class="meta" style="display:none"></div>
+    </div>
+
+    <div id="pcSwitch" class="toggle" role="switch" aria-checked="false" tabindex="0" title="Scan every image for a dominant color signature">
+      <span class="tlabel">Scan colors</span>
+      <span class="switch"><span class="knob"></span></span>
+      <div id="pcProg" class="meta" style="display:none">0 / 0</div>
+    </div>
+
+</div>
+  <div class="row" id="row2">
     <span class="eyebrow">Sort</span>
     <select id="sortBy" title="Sort images by attribute">
       <option value="name">Name</option>
@@ -1130,8 +1248,7 @@
     <div class="divider"></div>
 
     <span class="eyebrow">Filter</span>
-    <input id="fnQuery" type="search" placeholder="Filename" title="Filter by filename (substring match)" />
-    <input id="kwQuery" type="search" placeholder="Prompt keywords" title="Filter by prompt text — requires Prompts scan" />
+    <input id="kwQuery" type="search" placeholder="Prompt keywords" title="Filter by prompt text — requires Scan prompts" />
 
     <select id="oriSel" title="Filter by image orientation">
       <option value="all">Any orientation</option>
@@ -1150,17 +1267,19 @@
 
     <div id="colorStrip" class="colorStrip"></div>
 
-    <div id="recSwitch" class="toggle" role="switch" aria-checked="true" tabindex="0" title="Include subfolders when a folder is selected">
-      <span class="tlabel">Recursive</span>
+    <div id="recSwitch" class="toggle" role="switch" aria-checked="false" tabindex="0" title="Include subfolders when a folder is selected">
+      <span class="tlabel">Include subfolders</span>
       <span class="switch"><span class="knob"></span></span>
     </div>
 
     <div class="spacer"></div>
 
-    <button id="randomOpenBtn" class="btn" title="Open a random image (X)">🎲 Random</button>
-    <button id="favOnly" class="btn" title="Show favorites only">★ Favorites</button>
+    <button id="randomOpenBtn" class="btn" title="Open a random image (X)">Random image</button>
+    <button id="favOnly" class="btn" title="Show favorites only">Favorites only</button>
     <button id="resetFilters" class="btn" title="Clear all filters — click again to confirm">Reset filters</button>
   </div>
+
+  </section>
 
   <div id="folderRow" class="folderRow hidden">
     <span class="eyebrow">Path</span>
@@ -1201,10 +1320,21 @@
   <button id="quotaToastClose" class="btn ghost" title="Dismiss">Dismiss</button>
 </div>
 
+<div id="legacyFavoritesBanner" role="status" aria-live="polite">
+  <span id="legacyFavoritesText"></span>
+  <button id="legacyFavoritesImport" class="btn" type="button">Import old favorites</button>
+  <button id="legacyFavoritesDismiss" class="btn ghost" type="button">Dismiss</button>
+</div>
+
 <div id="folderToast">
   <span class="eyebrow">Folder path copied</span>
   <span id="folderToastPath" class="meta"></span>
   <button id="folderToastClose" class="btn ghost" title="Dismiss">Dismiss</button>
+</div>
+
+<div id="deleteToast" role="status" aria-live="polite" aria-atomic="true">
+  <span id="deleteToastText"></span>
+  <button id="deleteToastClose" class="btn ghost" type="button" title="Dismiss">Dismiss</button>
 </div>
 
 <div id="loader" role="status" aria-live="polite">
@@ -1215,7 +1345,7 @@
   <div class="bar"><div class="fill" id="loaderFill"></div></div>
 </div>
 
-<div id="confirmModal" role="dialog" aria-modal="true" aria-hidden="true">
+<div id="confirmModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="confirmTitle" aria-describedby="confirmMsg confirmHint">
   <div class="box">
     <div class="eyebrow">Confirm</div>
     <h3 id="confirmTitle">Delete image?</h3>
@@ -1223,9 +1353,9 @@
     <div id="confirmList" class="list"></div>
     <div class="actions">
       <button id="confirmCancel" class="btn ghost" type="button" title="Cancel (N / Esc)">Cancel</button>
-      <button id="confirmOk" class="btn danger" type="button" title="Confirm (Y / Enter)">Delete</button>
+      <button id="confirmOk" class="btn danger" type="button" title="Confirm (Y / Enter when focused)">Delete</button>
     </div>
-    <div class="hint"><kbd>Y</kbd> confirm · <kbd>N</kbd> or <kbd>Esc</kbd> cancel</div>
+    <div id="confirmHint" class="hint"><kbd>Enter</kbd> activates the focused button · <kbd>Y</kbd> confirm · <kbd>N</kbd> or <kbd>Esc</kbd> cancel</div>
   </div>
 </div>
 
@@ -1233,8 +1363,8 @@
   <div class="emptyIndex">01</div>
   <div class="emptyText">
     <div class="emptyEyebrow">Fast Gallery</div>
-    <div class="emptyTitle">Point at a folder. Browse thousands of images with no wait.</div>
-    <div class="emptySub">Open folder from the toolbar, or drop one anywhere on the window.</div>
+    <div class="emptyTitle">Your images, all in one place.</div>
+    <div class="emptySub">Choose Open folder or drop a folder anywhere to start browsing.</div>
   </div>
 </div>
 <div id="grid" aria-live="polite"></div>
@@ -1245,7 +1375,7 @@
   <div class="ptipHdr">
     <span>Prompt</span>
     <span class="ptipIdx" id="promptTipIdx">1 / 1</span>
-    <span class="ptipHint" id="promptTipHint">wheel to cycle</span>
+    <span class="ptipHint" id="promptTipHint">Scroll to cycle</span>
   </div>
   <div class="ptipBody" id="promptTipBody"></div>
 </div>
@@ -1260,10 +1390,12 @@
       <div class="vGroup">
         <button id="viewerPrev" class="vBtn navBtn" type="button" aria-label="Previous" title="Previous image (←)">◀</button>
         <button id="viewerNext" class="vBtn navBtn" type="button" aria-label="Next" title="Next image (→)">▶</button>
-        <button id="viewerRandom" class="vBtn" type="button" title="Random image (X)">🎲</button>
-        <button id="slideshowBtn" class="vBtn" type="button" title="Slideshow (S) — Alt-click cycles interval">▶ 3s</button>
-        <button id="shuffleBtn" class="vBtn" type="button" title="Shuffle slideshow (Shift+X)">⇄</button>
-        <button id="filmstripBtn" class="vBtn" type="button" title="Filmstrip (T)">▦</button>
+        <button id="viewerRandom" class="vBtn" type="button" title="Random image (X)">Random image</button>
+        <button id="slideshowBtn" class="vBtn" type="button" title="Start slideshow (S)">▶</button>
+        <label class="slideshowSpeed" title="Seconds between images"><input id="slideshowSeconds" type="number" min="0.25" max="3600" step="0.25" value="3" aria-label="Slideshow interval in seconds" /><span>s</span></label>
+        <button id="shuffleBtn" class="vBtn" type="button" title="Shuffle slideshow (Shift+X)">Shuffle</button>
+        <button id="filmstripBtn" class="vBtn" type="button" title="Filmstrip (T)">Filmstrip</button>
+        <button id="viewerMute" class="vBtn" type="button" title="Mute video (M)">🔊</button>
       </div>
       <div class="vGroup">
         <button id="viewerPrompt" class="vBtn" type="button" title="Show prompt (P)">
@@ -1273,16 +1405,20 @@
           Prompt
         </button>
         <button id="viewerFav" class="vBtn" type="button" title="Favorite (F)">☆</button>
-        <button id="viewerCopy" class="vBtn" type="button" title="Copy image path (C)">Copy path</button>
-        <button id="viewerFolder" class="vBtn" type="button" title="Copy folder path (Shift+C)">Copy folder</button>
+        <button id="viewerCopy" class="vBtn" type="button" title="Copy image (C / Ctrl+C)">Copy image</button>
+        <button id="viewerPath" class="vBtn" type="button" title="Copy image path (Alt+C)">Copy image path</button>
+        <button id="viewerFolder" class="vBtn" type="button" title="Copy folder path (Shift+C)">Copy folder path</button>
         <button id="viewerDl" class="vBtn" type="button" title="Download original file">Download</button>
-        <button id="viewerFull" class="vBtn" type="button" title="Decode at full resolution">Actual size</button>
+        <button id="viewerFull" class="vBtn" type="button" title="Decode at full resolution">Full resolution</button>
         <button id="viewerDel" class="vBtn danger" type="button" title="Delete image (Del)">Delete</button>
       </div>
       <div class="vGroup">
-        <button id="viewerFullscreen" class="vBtn" type="button" title="Fullscreen mode (Z)">⛶</button>
-        <button id="viewerHelp" class="vBtn" type="button" title="Keyboard shortcuts (?)">?</button>
-        <button id="viewerClose" class="vBtn ghost" type="button" title="Close viewer (Esc)">Close</button>
+        <button id="viewerZoomOut" class="vBtn" type="button" title="Zoom out (−)">−</button>
+        <button id="viewerFit" class="vBtn" type="button" title="Fit image (0)">Fit</button>
+        <button id="viewerZoomIn" class="vBtn" type="button" title="Zoom in (+)">+</button>
+        <button id="viewerRotate" class="vBtn" type="button" title="Rotate clockwise (R)">Rotate</button>
+        <button id="viewerFullscreen" class="vBtn" type="button" title="Fullscreen (Z)">Fullscreen</button>
+        <button id="viewerHelp" class="vBtn" type="button" title="Keyboard shortcuts (?)">Shortcuts</button>
       </div>
       <div class="winCtl" data-winctl-scope="viewer">
         <button class="min" type="button" title="Minimize" aria-label="Minimize">–</button>
@@ -1295,6 +1431,7 @@
   <div class="stage" id="viewerStage">
     <canvas id="viewerCanvas"></canvas>
     <img id="viewerImgOverlay" alt="" />
+    <video id="viewerVideoOverlay" playsinline preload="metadata" controls></video>
     <div class="filmstripWrap">
       <button id="fsStripPrev" class="fsNav left" type="button" aria-label="Scroll filmstrip left" title="Scroll filmstrip left">◀</button>
       <div id="viewerFilmstrip"></div>
@@ -1306,8 +1443,10 @@
         <button class="max" type="button" title="Maximize / restore" aria-label="Maximize / restore"><span class="maxIcon">▢</span><span class="restoreIcon">❐</span></button>
         <button class="close" type="button" title="Close (hide to tray)" aria-label="Close">×</button>
       </div>
-      <button id="fsMenuBtn" class="fsMenuBtn" type="button" title="Show controls menu" aria-label="Controls menu">☰</button>
-      <div id="fsPanel" class="fsPanel" role="menu">
+      <button id="viewerClose" class="fsMenuBtn galleryReturn" type="button" title="Return to gallery (Esc)">Gallery</button>
+      <button id="fsMenuBtn" class="fsMenuBtn" type="button" title="Show viewer controls" aria-label="Viewer controls" aria-expanded="false" aria-controls="fsPanel">Controls</button>
+      <div id="fsPanel" class="fsPanel" role="region" aria-label="Viewer controls" hidden>
+        <div class="panelHeading"><strong>Viewer controls</strong><button id="viewerControlsClose" class="btn ghost" type="button" title="Close controls">×</button></div>
         <div id="fsPanelTitle" class="fsTitle"></div>
         <div class="fsRows" id="fsPanelRows"></div>
       </div>
@@ -1330,7 +1469,7 @@
         <button id="pClose" class="ghost" type="button" title="Close prompt panel (P)">Close</button>
       </div>
     </div>
-    <div id="promptText" class="empty">No prompt data.</div>
+    <div id="promptText" class="empty">No prompt found.</div>
   </div>
 
 
@@ -1345,13 +1484,15 @@
     <tr><td class="k">Shift+X</td><td>Toggle shuffle slideshow</td></tr>
     <tr><td class="k">P</td><td>Prompt panel</td></tr>
     <tr><td class="k">F</td><td>Favorite</td></tr>
-    <tr><td class="k">C</td><td>Copy image path</td></tr>
+    <tr><td class="k">C / Ctrl+C</td><td>Copy image</td></tr>
+    <tr><td class="k">Alt+C</td><td>Copy image path</td></tr>
     <tr><td class="k">Shift+C</td><td>Copy folder path</td></tr>
     <tr><td class="k">+ / -</td><td>Zoom in / out</td></tr>
     <tr><td class="k">0 / 1</td><td>Fit / 1:1</td></tr>
-    <tr><td class="k">R / Shift+R</td><td>Rotate cw / ccw</td></tr>
+    <tr><td class="k">R / Shift+R</td><td>Rotate clockwise / counterclockwise</td></tr>
     <tr><td class="k">S</td><td>Slideshow</td></tr>
     <tr><td class="k">T</td><td>Filmstrip</td></tr>
+    <tr><td class="k">M</td><td>Mute / unmute video</td></tr>
     <tr><td class="k">Z</td><td>Fullscreen mode</td></tr>
     <tr><td class="k">Del</td><td>Delete image</td></tr>
     <tr><td class="k">Esc</td><td>Close panel, then viewer</td></tr>
@@ -1367,7 +1508,8 @@
   </table>
   <h3 style="margin-top:20px">Modals &amp; banners</h3>
   <table>
-    <tr><td class="k">Y / Enter</td><td>Confirm</td></tr>
+    <tr><td class="k">Y</td><td>Confirm</td></tr>
+    <tr><td class="k">Enter</td><td>Activate focused button</td></tr>
     <tr><td class="k">N / Esc</td><td>Cancel / dismiss</td></tr>
   </table>
 </div>
@@ -1430,6 +1572,13 @@ const walkToastText  = document.getElementById('walkToastText');
 const walkToastClose = document.getElementById('walkToastClose');
 const quotaToast      = document.getElementById('quotaToast');
 const quotaToastClose = document.getElementById('quotaToastClose');
+const legacyFavoritesBanner = document.getElementById('legacyFavoritesBanner');
+const legacyFavoritesText = document.getElementById('legacyFavoritesText');
+const legacyFavoritesImport = document.getElementById('legacyFavoritesImport');
+const legacyFavoritesDismiss = document.getElementById('legacyFavoritesDismiss');
+const deleteToast = document.getElementById('deleteToast');
+const deleteToastText = document.getElementById('deleteToastText');
+const deleteToastClose = document.getElementById('deleteToastClose');
 const pcSwitch = document.getElementById('pcSwitch');
 const pcProg   = document.getElementById('pcProg');
 const pfEstEl  = document.getElementById('pfEst');
@@ -1463,11 +1612,15 @@ const viewerPrev  = document.getElementById('viewerPrev');
 const viewerNext  = document.getElementById('viewerNext');
 const viewerFav   = document.getElementById('viewerFav');
 const viewerCopy  = document.getElementById('viewerCopy');
+const viewerPath = document.getElementById('viewerPath');
+const slideshowSeconds = document.getElementById('slideshowSeconds');
 const viewerFolder = document.getElementById('viewerFolder');
 const viewerStage = document.getElementById('viewerStage');
 const viewerCanvas= document.getElementById('viewerCanvas');
 const viewerBadge = document.getElementById('viewerBadge');
 const viewerImgOverlay = document.getElementById('viewerImgOverlay');
+const viewerVideoOverlay = document.getElementById('viewerVideoOverlay');
+const viewerMute       = document.getElementById('viewerMute');
 const viewerFilmstrip  = document.getElementById('viewerFilmstrip');
 const fsStripPrev      = document.getElementById('fsStripPrev');
 const fsStripNext      = document.getElementById('fsStripNext');
@@ -1500,6 +1653,10 @@ const hasViewerCanvas = !!vctx;
 // State
 // =====================================================================
 let files = [];   // entries: {name, path, handle, file, ext, size, lastModified}
+let fileGeneration = 0;
+let fileWorkAbort = new AbortController();
+let folderLoadAbort = null;
+let folderLoadingRoot = null;
 let view  = [];   // Array<number>, indices into files
 let _pendingOpenName = "";  // set on desktop boot with a target file to auto-open in the viewer
 let dims = [];
@@ -1514,6 +1671,20 @@ let currentIndex = -1;
 let currentViewPos = 0;
 let currentPromptIdx = 0;
 let showingPromptPanel = false;
+const backgroundWaiters = new Set();
+function waitForBackground(signal) {
+  if (!viewer.classList.contains('open') || signal.aborted) return Promise.resolve();
+  return new Promise(resolve => {
+    const resume = () => {
+      backgroundWaiters.delete(resume);
+      signal.removeEventListener('abort', resume);
+      resolve();
+    };
+    backgroundWaiters.add(resume);
+    signal.addEventListener('abort', resume, { once:true });
+  });
+}
+function resumeBackgroundWork() { for (const resume of backgroundWaiters) resume(); }
 
 let multiselect = false;
 const selected = new Set();
@@ -1529,8 +1700,13 @@ let prefetchDone = 0;
 let prefetchAbort = null;
 
 const GAP = 12;
-const MIN_COL_W = 240;
-const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|avif|bmp)$/i;
+// Master gate for what shows in the gallery. Despite the name it also covers
+// video now (mp4/webm) — kept as-is because the walk / isImage / drop handler
+// all rely on it. Use VIDEO_EXT_RE below to branch on video specifically.
+const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|avif|bmp|mp4|webm)$/i;
+const VIDEO_EXT_RE = /\.(mp4|webm)$/i;
+const isVideo = (name) => VIDEO_EXT_RE.test(name || "");
+function isVideoIndex(i){ const f = files[i]; return !!f && VIDEO_EXT_RE.test(f.name || ("." + (f.ext || ""))); }
 
 const PREVIEW_MAX_PIXELS = 16_000_000;
 const PREVIEW_MAX_DIM = 8192;
@@ -1545,45 +1721,67 @@ const JPEG_META_MAX = 4 * 1024 * 1024;
 const IDB_NAME = 'fast_gallery';
 const STORE_HANDLES = 'handles';
 const STORE_FAVORITES = 'favorites';
+const STORE_ROOTS = 'roots';
 const HANDLE_KEY = 'last';
 let _idbPromise = null;
 
 function openIdb() {
   if (_idbPromise) return _idbPromise;
   _idbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_NAME, 1);
+    // Version 2 also repairs databases created without stores by older shims.
+    const req = indexedDB.open(IDB_NAME, 2);
+    let settled = false;
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE_HANDLES))   db.createObjectStore(STORE_HANDLES);
       if (!db.objectStoreNames.contains(STORE_FAVORITES)) db.createObjectStore(STORE_FAVORITES);
+      if (!db.objectStoreNames.contains(STORE_ROOTS)) db.createObjectStore(STORE_ROOTS);
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror   = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      if (settled) { db.close(); return; }
+      settled = true;
+      db.onversionchange = () => { db.close(); _idbPromise = null; };
+      resolve(db);
+    };
+    req.onerror = () => { settled = true; reject(req.error); };
+    req.onblocked = () => {
+      settled = true;
+      showQuotaToast('Favorites storage needs an update. Close other gallery windows, then reopen this folder.');
+      reject(new Error('Database upgrade blocked'));
+    };
+  }).catch(err => {
+    _idbPromise = null;
+    throw err;
   });
   return _idbPromise;
 }
-function idbGet(store, key) {
+function idbRead(store, makeRequest, fallback) {
   return openIdb().then(db => new Promise((resolve) => {
     try {
       const tx = db.transaction(store, 'readonly');
-      const r = tx.objectStore(store).get(key);
-      r.onsuccess = () => resolve(r.result);
-      r.onerror   = () => resolve(undefined);
-    } catch (_) { resolve(undefined); }
-  }));
+      const r = makeRequest(tx.objectStore(store));
+      let value = fallback;
+      r.onsuccess = () => { value = r.result; };
+      tx.oncomplete = () => resolve(value);
+      tx.onabort = tx.onerror = () => { showQuotaToast(); resolve(fallback); };
+    } catch (_) { showQuotaToast(); resolve(fallback); }
+  })).catch(() => { showQuotaToast(); return fallback; });
 }
+function idbGet(store, key, fallback = undefined) { return idbRead(store, s => s.get(key), fallback); }
+function idbGetAll(store) { return idbRead(store, s => s.getAll(), null); }
 function idbPut(store, val, key) {
   return openIdb().then(db => new Promise((resolve) => {
     try {
       const tx = db.transaction(store, 'readwrite');
-      const r = tx.objectStore(store).put(val, key);
-      r.onsuccess = () => resolve(true);
-      r.onerror   = () => { if (store === STORE_FAVORITES) showQuotaToast(); resolve(false); };
+      tx.objectStore(store).put(val, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onabort = tx.onerror = () => { if (store === STORE_FAVORITES) showQuotaToast(); resolve(false); };
     } catch (_) { if (store === STORE_FAVORITES) showQuotaToast(); resolve(false); }
   })).catch(() => { if (store === STORE_FAVORITES) showQuotaToast(); return false; });
 }
-function showQuotaToast() {
-  if (quotaToastShown) return;
+function showQuotaToast(message) {
+  document.getElementById('quotaToastText').textContent = message || 'Favorites not saved — storage full or unavailable.';
   quotaToastShown = true;
   quotaToast.style.display = "flex";
 }
@@ -1605,9 +1803,11 @@ async function walkDirectoryFSA(dirHandle, onBatch, abortSignal, stats) {
   // Using dirHandle.name as the initial prefix would treat the picked folder
   // as a subfolder of itself and break the recursive=false filter.
   const queue = [[dirHandle, ""]];
-  while (queue.length) {
+  let queueHead = 0;
+  while (queueHead < queue.length) {
     if (abortSignal?.aborted) break;
-    const [cur, prefix] = queue.shift();
+    const [cur, prefix] = queue[queueHead];
+    queue[queueHead++] = null;
     try {
       for await (const [name, child] of cur.entries()) {
         if (abortSignal?.aborted) break;
@@ -1621,7 +1821,7 @@ async function walkDirectoryFSA(dirHandle, onBatch, abortSignal, stats) {
             name, path, handle: child, parent: cur, file: null,
             abs: child.absPath || "",
             ext: extOf(name).slice(1),
-            size: undefined, lastModified: undefined,
+            size: child._size, lastModified: child._mtimeMs,
             pathLc: pLc,
             folderLc: slash < 0 ? "" : pLc.slice(0, slash),
           });
@@ -1639,6 +1839,8 @@ async function walkDirectoryFSA(dirHandle, onBatch, abortSignal, stats) {
 }
 
 async function restoreLastHandle() {
+  // Native handles are not browser FSA handles; leave persisted data intact.
+  if (window.__FG_NATIVE__) return null;
   try {
     const handle = await idbGet(STORE_HANDLES, HANDLE_KEY);
     if (!handle) return null;
@@ -1677,13 +1879,95 @@ function onFileAccessError(err) {
   }
 }
 
+const FAVORITES_READ_FAILED = Symbol('favorites-read-failed');
+const favoriteReadFailures = new Set();
 async function loadFavoritesFor(key) {
-  const arr = await idbGet(STORE_FAVORITES, key);
+  if (!key) return new Set();
+  const arr = await idbGet(STORE_FAVORITES, key, FAVORITES_READ_FAILED);
+  if (arr === FAVORITES_READ_FAILED) { favoriteReadFailures.add(key); return new Set(); }
+  favoriteReadFailures.delete(key);
   return new Set(Array.isArray(arr) ? arr : []);
 }
 async function saveFavoritesFor(key, set) {
-  if (!key) return false;
+  if (!key) {
+    showQuotaToast('Favorites for this import are temporary and will be cleared when another folder is opened.');
+    return false;
+  }
+  if (favoriteReadFailures.has(key)) {
+    showQuotaToast('Favorites could not be loaded. Reopen this folder before saving changes.');
+    return false;
+  }
   return await idbPut(STORE_FAVORITES, Array.from(set), key);
+}
+
+// Native root IDs are session-only. Hash the canonical path for a stable key
+// without adding an absolute filesystem path to IndexedDB. Browser FSA handles
+// are opaque: compare them with isSameEntry and persist a random namespace.
+let favoriteRootWork = Promise.resolve();
+function favoritesKeyForHandle(handle) {
+  const work = favoriteRootWork.then(async () => {
+    if (!handle || handle.kind !== 'directory') return '';
+    if (handle._rootId) {
+      if (!handle.absPath || !window.crypto?.subtle) return '';
+      const path = handle.absPath.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+      const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(path));
+      return 'native:v2:' + Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+    }
+    if (typeof handle.isSameEntry !== 'function') return '';
+    const records = await idbGetAll(STORE_ROOTS);
+    if (!records) return '';
+    for (const record of records) {
+      if (!record.handle) continue;
+      try { if (await handle.isSameEntry(record.handle)) return record.id; } catch (_) {}
+    }
+    const id = 'fsa:v2:' + window.crypto.randomUUID();
+    return await idbPut(STORE_ROOTS, {id, handle}, id) ? id : '';
+  }).catch(() => { showQuotaToast(); return ''; });
+  favoriteRootWork = work.then(() => {});
+  return work;
+}
+function legacyFavoriteKeysFor(handle) {
+  const name = handle?.name || 'root';
+  return ['fsa:' + name, 'drop:' + name, 'webkit:' + name];
+}
+let legacyFavoriteOffer = null;
+async function offerLegacyFavorites(key, aliases, generation) {
+  if (!key || !aliases.length) return;
+  const record = await idbGet(STORE_ROOTS, key);
+  if (record?.legacyHandled) return;
+  const paths = new Set(files.map(e => e.path));
+  const matches = new Set();
+  for (const alias of aliases) {
+    const old = await idbGet(STORE_FAVORITES, alias);
+    const prefix = alias.slice(alias.indexOf(':') + 1) + '/';
+    for (const path of Array.isArray(old) ? old : []) {
+      if (typeof path !== 'string') continue;
+      if (paths.has(path)) matches.add(path);
+      else if (!alias.startsWith('fsa:') && path.startsWith(prefix) && paths.has(path.slice(prefix.length))) matches.add(path.slice(prefix.length));
+    }
+  }
+  if (generation !== fileGeneration || key !== rootKey || !matches.size) return;
+  legacyFavoriteOffer = {key, generation, matches};
+  legacyFavoritesText.textContent = `${matches.size} matching old favorite${matches.size === 1 ? '' : 's'} found. Older versions shared favorites between folders with the same name. Import them for this folder?`;
+  legacyFavoritesImport.disabled = legacyFavoritesDismiss.disabled = false;
+  legacyFavoritesBanner.style.display = 'flex';
+}
+async function finishLegacyFavorites(importFavorites) {
+  const offer = legacyFavoriteOffer;
+  if (!offer || offer.generation !== fileGeneration || offer.key !== rootKey || legacyFavoritesImport.disabled) return;
+  legacyFavoritesImport.disabled = legacyFavoritesDismiss.disabled = true;
+  try {
+    if (importFavorites) {
+      for (const path of offer.matches) favorites.add(path);
+      applyFilters(); updateFavButton();
+      if (!await saveFavoritesFor(offer.key, favorites)) return;
+    }
+    const record = await idbGet(STORE_ROOTS, offer.key);
+    if (!await idbPut(STORE_ROOTS, {...record, id:offer.key, legacyHandled:true}, offer.key)) { showQuotaToast(); return; }
+    if (legacyFavoriteOffer === offer) { legacyFavoritesBanner.style.display = 'none'; legacyFavoriteOffer = null; }
+  } finally {
+    if (legacyFavoriteOffer === offer) legacyFavoritesImport.disabled = legacyFavoritesDismiss.disabled = false;
+  }
 }
 
 // =====================================================================
@@ -1692,6 +1976,39 @@ async function saveFavoritesFor(key, set) {
 const extOf = (name) => (name.match(/\.[^.]+$/)?.[0] || "").toLowerCase();
 const isImage = (name) => IMAGE_EXT_RE.test(name || "");
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ACTION_ICONS = {
+  prev:'M15 5l-7 7 7 7',next:'M9 5l7 7-7 7',play:'M8 5l11 7-11 7z',pause:'M8 5v14M16 5v14',
+  shuffle:'M3 6h3l12 12h3M17 14l4 4-4 4M3 18h3L18 6h3M17 2l4 4-4 4',
+  film:'M3 4h18v16H3zM7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4',
+  volume:'M3 9h4l5-4v14l-5-4H3zM16 8a6 6 0 010 8M19 5a10 10 0 010 14',
+  muted:'M3 9h4l5-4v14l-5-4H3zM16 9l5 6M21 9l-5 6',
+  prompt:'M4 5h16v12H9l-5 4zM8 9h8M8 13h5',star:'M12 3l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z',
+  image:'M4 4h16v16H4zM4 16l5-5 4 4 3-3 4 4M15 8h.01',path:'M9 7H6a5 5 0 000 10h3M15 7h3a5 5 0 010 10h-3M8 12h8',
+  folder:'M3 6h7l2 2h9v12H3z',download:'M12 3v12M7 10l5 5 5-5M4 17v4h16v-4',
+  fullres:'M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6M8 8h8v8H8z',
+  trash:'M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6',
+  fullscreen:'M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6',exitFull:'M9 3v6H3M21 9h-6V3M15 21v-6h6M3 15h6v6',
+  help:'M9 8a3 3 0 116 1c0 2-3 2-3 5M12 18h.01M12 2a10 10 0 100 20 10 10 0 000-20',
+  close:'M6 6l12 12M18 6L6 18',zoomIn:'M10 4a6 6 0 100 12 6 6 0 000-12M15 15l6 6M7 10h6M10 7v6',
+  zoomOut:'M10 4a6 6 0 100 12 6 6 0 000-12M15 15l6 6M7 10h6',fit:'M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5M7 7h10v10H7z',
+  rotate:'M4 9a8 8 0 111 9M4 3v6h6',
+};
+function setActionIcon(button, icon, label) {
+  if (!button) return;
+  button.classList.add('iconAction');
+  button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ACTION_ICONS[icon] || ACTION_ICONS.help}"/></svg>`;
+  if (label) button.title = label;
+  button.setAttribute('aria-label', button.title);
+}
+const actionNotice = document.createElement('div');
+actionNotice.className = 'actionNotice'; actionNotice.hidden = true;
+actionNotice.setAttribute('role', 'status'); actionNotice.setAttribute('aria-live', 'polite');
+document.body.appendChild(actionNotice);
+let actionNoticeTimer = 0;
+function showActionNotice(text) {
+  actionNotice.textContent = text; actionNotice.hidden = false;
+  clearTimeout(actionNoticeTimer); actionNoticeTimer = setTimeout(() => { actionNotice.hidden = true; }, 5000);
+}
 const isValidIndex = (i) => Number.isInteger(i) && i >= 0 && i < files.length;
 function folderOf(path) {
   const s = String(path || "");
@@ -1748,6 +2065,32 @@ function syncBarHeight() {
   document.documentElement.style.setProperty('--barH', h + 'px');
 }
 requestAnimationFrame(syncBarHeight);
+
+const galleryControls = document.getElementById('galleryControls');
+const galleryControlsBtn = document.getElementById('galleryControlsBtn');
+function setGalleryControls(open, restoreFocus = false) {
+  galleryControls.hidden = !open;
+  galleryControlsBtn.setAttribute('aria-expanded', String(open));
+  galleryControlsBtn.classList.toggle('on', open);
+  if (open) galleryControls.querySelector('button').focus();
+  else if (restoreFocus) galleryControlsBtn.focus();
+}
+galleryControlsBtn.addEventListener('click', () => setGalleryControls(galleryControls.hidden));
+document.getElementById('galleryControlsClose').addEventListener('click', () => setGalleryControls(false, true));
+document.addEventListener('pointerdown', e => {
+  if (!galleryControls.contains(e.target) && !galleryControlsBtn.contains(e.target)) setGalleryControls(false);
+}, true);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !galleryControls.hidden && !viewer.classList.contains('open') && !confirmModal.classList.contains('open')) {
+    e.preventDefault(); e.stopImmediatePropagation(); setGalleryControls(false, true);
+  }
+}, true);
+new ResizeObserver(syncBarHeight).observe(topBar);
+// Give symbol-only buttons and inputs explicit accessible names.
+document.querySelectorAll('button[title], input[title], select[title]').forEach(el => {
+  if (!el.hasAttribute('aria-label')) el.setAttribute('aria-label', el.title);
+});
+
 
 let scrollLockY = 0, scrollLockPad = 0;
 function lockScroll() {
@@ -1830,25 +2173,64 @@ async function getDims(file) {
   if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return await getJpegDims(file);
   return await getGenericDimsViaBitmap(file);
 }
+// Video dimensions from a metadata-only load. No pixel read → no crossOrigin
+// (setting it would make a non-CORS asset URL fail to load outright).
+async function getVideoDims(entry) {
+  let srcUrl = "", own = false;
+  const abs = entry && entry.abs;
+  if (abs && typeof window.__fgAssetUrl === 'function') {
+    srcUrl = window.__fgAssetUrl(abs);
+  } else {
+    try { const f = await getFileForEntry(entry); srcUrl = URL.createObjectURL(f); own = true; }
+    catch (_) { return { w: 1, h: 1, _unknown: true }; }
+  }
+  return await new Promise((resolve) => {
+    const v = document.createElement('video');
+    v.muted = true; v.preload = 'metadata';
+    let done = false;
+    const finish = (d) => {
+      if (done) return; done = true; clearTimeout(t);
+      try { v.removeAttribute('src'); v.load(); } catch (_) {}
+      if (own && srcUrl) { try { URL.revokeObjectURL(srcUrl); } catch (_) {} }
+      resolve(d);
+    };
+    const t = setTimeout(() => finish({ w: 1, h: 1, _unknown: true }), 6000);
+    v.addEventListener('loadedmetadata', () => {
+      const w = v.videoWidth, h = v.videoHeight;
+      finish((w && h) ? { w, h } : { w: 1, h: 1, _unknown: true });
+    }, { once: true });
+    v.addEventListener('error', () => finish({ w: 1, h: 1, _unknown: true }), { once: true });
+    v.src = srcUrl;
+    try { v.load(); } catch (_) {}
+  });
+}
 async function ensureDims(i) {
+  const entry = files[i];
+  if (!entry) return { w:1, h:1, _unknown:true };
   if (dims[i]) return dims[i];
   if (!dimsP[i]) {
+    const generation = fileGeneration;
+    const targetDims = dims;
     dimsP[i] = (async () => {
+      let result;
       try {
-        const entry = files[i];
+        // Video: __fgDims/getDims can't read video headers — use the element.
+        if (isVideo(entry.name)) result = await getVideoDims(entry);
         // Desktop fast path: header-only decode in Rust. No pixel read, no
         // file bytes shipped to JS.
-        if (entry && entry.handle && entry.handle._rootId && typeof window.__fgDims === 'function') {
-          const d = await window.__fgDims(entry.handle._rootId, entry.handle._rel);
-          if (d) { dims[i] = d; return d; }
+        else if (entry.handle && entry.handle._rootId && typeof window.__fgDims === 'function') {
+          result = await window.__fgDims(entry.handle._rootId, entry.handle._rel);
         }
-        const file = await getFileForEntry(entry);
-        const d = await getDims(file);
-        dims[i] = d;
+        if (!result && generation === fileGeneration && files[i] === entry) {
+          const file = await getFileForEntry(entry);
+          result = await getDims(file);
+        }
       } catch (_) {
-        dims[i] = { w: 1, h: 1, _unknown: true };
+        result = null;
       }
-      return dims[i];
+      result ||= { w:1, h:1, _unknown:true };
+      if (generation === fileGeneration && files[i] === entry) targetDims[i] = result;
+      return result;
     })();
   }
   return dimsP[i];
@@ -2307,10 +2689,11 @@ function mergeSidecarIntoPrompts(list, sidecar) {
 function ensurePrompts(i) {
   if (prompts[i]) return Promise.resolve(prompts[i]);
   if (promptsP[i]) return promptsP[i];
+  const entry = files[i];
+  const generation = fileGeneration;
   promptsP[i] = (async () => {
     let list = [];
     try {
-      const entry = files[i];
       // Desktop fast path: request just the file head. PNG/JPEG metadata for
       // prompts lives near the start; 2 MB is enough for realistic images.
       if (entry && entry.handle && entry.handle._rootId && typeof window.__fgReadHead === 'function') {
@@ -2325,10 +2708,10 @@ function ensurePrompts(i) {
       }
     } catch (_) {}
     try {
-      const side = await sidecarEntryForIndex(i);
+      const side = generation === fileGeneration && files[i] === entry ? await sidecarEntryForIndex(i) : null;
       if (side) list = mergeSidecarIntoPrompts(list, side);
     } catch (_) {}
-    prompts[i] = list;
+    if (generation === fileGeneration && files[i] === entry) prompts[i] = list;
     return list;
   })();
   return promptsP[i];
@@ -2416,7 +2799,7 @@ const filterState = (() => {
     orientation:'all', colors:new Set(), keyword:'',
     promptFilter:'all',
     favoritesOnly:false, randomSeed:1,
-    currentPath:'', recursive:true,
+    currentPath:'', recursive:false,
   };
   try {
     const raw = localStorage.getItem('fast_gallery_view');
@@ -2432,7 +2815,7 @@ const filterState = (() => {
       if (typeof p.promptFilter === 'string') d.promptFilter = p.promptFilter;
       if (typeof p.favoritesOnly === 'boolean') d.favoritesOnly = p.favoritesOnly;
       if (typeof p.currentPath === 'string') d.currentPath = p.currentPath;
-      if (typeof p.recursive === 'boolean') d.recursive = p.recursive;
+      if (p.recursivePreferenceVersion === 2 && typeof p.recursive === 'boolean') d.recursive = p.recursive;
     }
   } catch (_) {}
   return d;
@@ -2450,6 +2833,7 @@ function saveFilterState() {
       favoritesOnly:filterState.favoritesOnly,
       currentPath:filterState.currentPath,
       recursive:filterState.recursive,
+      recursivePreferenceVersion:2,
     }));
   } catch (_) {}
 }
@@ -2572,6 +2956,12 @@ async function ensureSortDataFor(sortBy) {
 }
 
 function applyFilters() {
+  const activeFilters = [filterState.query, filterState.keyword,
+    filterState.orientation !== 'all', filterState.promptFilter !== 'all',
+    filterState.formats !== null, filterState.colors.size > 0,
+    filterState.favoritesOnly, filterState.recursive].filter(Boolean).length;
+  galleryControlsBtn.textContent = activeFilters ? `Controls (${activeFilters})` : 'Controls';
+  galleryControlsBtn.title = activeFilters ? `${activeFilters} active filters` : 'Gallery controls';
   view = buildView();
   viewCountEl.textContent = String(view.length);
   viewCountWrap.style.display = files.length ? "block" : "none";
@@ -2583,6 +2973,8 @@ function applyFilters() {
 // =====================================================================
 let slots = [];
 let slotsByTop = [];
+// Key by file index, not view position: metadata can reorder the view while
+// existing tiles and their loaded/pending thumbnails stay attached.
 const mounted = new Map();
 const pool = [];
 let pendingFrame = 0;
@@ -2595,8 +2987,7 @@ function pickShortest(colHeights) {
 
 function computeLayout() {
   const W = grid.clientWidth || 0;
-  const maxPossible = Math.max(1, Math.floor((W + GAP) / (MIN_COL_W + GAP)));
-  const cols = Math.max(1, Math.min(desiredCols, 12, maxPossible));
+  const cols = Math.max(1, Math.min(desiredCols, 12));
   const colW = Math.floor((W - GAP * (cols - 1)) / cols);
   return { cols, colW, GAP };
 }
@@ -2619,6 +3010,8 @@ function computeSlots() {
   for (const h of colHeights) if (h > maxH) maxH = h;
   grid.style.height = (maxH ? maxH - GAP : 0) + "px";
   slotsByTop = slots.slice().sort((a,b) => a.top - b.top);
+  let maxBottom = 0;
+  for (const slot of slotsByTop) slot.maxBottom = maxBottom = Math.max(maxBottom, slot.top + slot.height);
 }
 
 function firstVisibleSlotIndex(scrollY) {
@@ -2627,14 +3020,81 @@ function firstVisibleSlotIndex(scrollY) {
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
     const s = slotsByTop[mid];
-    if (s.top + s.height >= target) hi = mid; else lo = mid + 1;
+    if (s.maxBottom >= target) hi = mid; else lo = mid + 1;
   }
   return lo;
 }
 
+// Only the hovered tile owns a decoder. Invalidate pending file reads when
+// the pointer leaves or virtualization recycles the tile.
+let hoverPreview = null;
+function stopHoverPreview(node) {
+  const preview = hoverPreview;
+  if (!preview || (node && preview.node !== node)) return;
+  hoverPreview = null;
+  clearTimeout(preview.timer);
+  preview.node.classList.remove('previewing');
+  if (preview.video) {
+    preview.video.pause();
+    preview.video.removeAttribute('src');
+    preview.video.load();
+    preview.video.remove();
+  }
+  if (preview.url) URL.revokeObjectURL(preview.url);
+}
+function startHoverPreview(node, event) {
+  if (event.pointerType === 'touch' || document.hidden || viewer.classList.contains('open')) return;
+  const entry = files[Number(node.dataset.index)];
+  if (!entry || !isVideo(entry.name)) return;
+  stopHoverPreview();
+  const preview = { node, entry, timer:0, video:null, url:null };
+  hoverPreview = preview;
+  preview.timer = setTimeout(async () => {
+    const current = () => hoverPreview === preview && node.isConnected &&
+      files[Number(node.dataset.index)] === entry && !document.hidden;
+    try {
+      let src;
+      if (entry.abs && typeof window.__fgAssetUrl === 'function') {
+        src = window.__fgAssetUrl(entry.abs);
+      } else {
+        const file = await getFileForEntry(entry);
+        if (!current()) return;
+        src = preview.url = URL.createObjectURL(file);
+      }
+      if (!current()) return;
+      const video = preview.video = document.createElement('video');
+      video.className = 'hoverVideo';
+      video.muted = true; video.defaultMuted = true;
+      video.loop = true; video.playsInline = true; video.preload = 'none';
+      video.tabIndex = -1; video.setAttribute('aria-hidden', 'true');
+      video.addEventListener('playing', () => {
+        if (current()) node.classList.add('previewing');
+      });
+      video.addEventListener('error', () => {
+        if (hoverPreview === preview) stopHoverPreview(node);
+      }, { once:true });
+      // Keep all existing tile overlays and action buttons above the preview.
+      node.querySelector('img.thumb').after(video);
+      video.src = src;
+      await video.play();
+    } catch (_) {
+      // Unsupported codecs or autoplay refusal leave the poster intact.
+      if (hoverPreview === preview) stopHoverPreview(node);
+    }
+  }, 150);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopHoverPreview();
+});
+window.addEventListener('blur', () => stopHoverPreview());
+window.addEventListener('scroll', () => stopHoverPreview(), { passive:true });
+
 function makeTileNode() {
   const tile = document.createElement('div');
   tile.className = 'tile';
+  tile.addEventListener('pointerenter', e => startHoverPreview(tile, e));
+  tile.addEventListener('pointerleave', () => stopHoverPreview(tile));
+  tile.addEventListener('pointercancel', () => stopHoverPreview(tile));
   const img = document.createElement('img');
   img.className = 'thumb';
   img.decoding = 'async';
@@ -2653,14 +3113,16 @@ function makeTileNode() {
   const del = document.createElement('button');
   del.type = 'button'; del.className = 'del'; del.title = 'Delete';
   del.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const vplay = document.createElement('div'); vplay.className = 'vplay'; vplay.textContent = '▶';
   tile.appendChild(img); tile.appendChild(num); tile.appendChild(dim);
-  tile.appendChild(pchip); tile.appendChild(fchip); tile.appendChild(star); tile.appendChild(selWrap); tile.appendChild(dl); tile.appendChild(del);
+  tile.appendChild(pchip); tile.appendChild(fchip); tile.appendChild(star); tile.appendChild(selWrap); tile.appendChild(dl); tile.appendChild(del); tile.appendChild(vplay);
   return tile;
 }
 
 function applyTileData(node, slot) {
   const i = slot.index;
   const entry = files[i];
+  if (hoverPreview?.node === node && hoverPreview.entry !== entry) stopHoverPreview(node);
   const folder = folderOf(entry.path);
   const depth = depthOf(folder);
   node.dataset.index = String(i);
@@ -2668,6 +3130,7 @@ function applyTileData(node, slot) {
   node.dataset.selected = selected.has(i) ? "1" : "0";
   node.dataset.hasprompt = (prompts[i] && prompts[i].length) ? "1" : "0";
   node.dataset.fav = favorites.has(entry.path) ? "1" : "0";
+  node.dataset.video = (entry && isVideo(entry.name)) ? "1" : "0";
   node.dataset.folder = folder;
   node.dataset.depth = String(Math.min(depth, 8));
 
@@ -2689,11 +3152,17 @@ function applyTileData(node, slot) {
 }
 
 function resetTileNode(node) {
+  stopHoverPreview(node);
+  node._thumbAbort?.abort();
+  node._thumbAbort = null;
   const img = node.querySelector('img.thumb');
   if (img) {
     if (img._objectUrl) { try { URL.revokeObjectURL(img._objectUrl); } catch (_) {} img._objectUrl = null; }
     img.removeAttribute('src');
+    img.onerror = null;
     img._loadedForIndex = -1;
+    img._loadedForEntry = null;
+    img._thumbPending = false;
   }
   node.classList.remove('loaded', 'errored');
 }
@@ -2719,48 +3188,176 @@ function forgetAllThumbUrls() {
   }
   thumbUrlByIdx.clear();
 }
+// ---- Video poster capture ---------------------------------------------------
+// Rust's `image` crate can't decode video, so mp4/webm posters are grabbed here:
+// load into a detached <video>, seek just past the start, draw one frame to a
+// canvas, hand back a JPEG blob URL + the video's real WxH. Concurrency is
+// capped low because each capture spins up a real decoder — far heavier than a
+// Rust JPEG resize — and we don't want a video-heavy folder to stall scrolling.
+const VIDEO_POSTER_CONC = 2;
+let _videoPosterActive = 0;
+const _videoPosterQueue = [];
+const _POSTER_TAINTED = Symbol('poster-tainted');
+function _drainVideoPosterQueue() {
+  while (_videoPosterActive < VIDEO_POSTER_CONC && _videoPosterQueue.length) {
+    const job = _videoPosterQueue.shift();
+    _videoPosterActive++;
+    Promise.resolve().then(job).finally(() => { _videoPosterActive--; _drainVideoPosterQueue(); });
+  }
+}
+// Grab a single frame from srcUrl → {url,w,h} | null | _POSTER_TAINTED.
+// Returns _POSTER_TAINTED when the canvas is cross-origin-tainted (asset scheme
+// without CORS) so the caller can retry with a same-origin object URL.
+function _grabVideoFrame(srcUrl, maxEdge, isObjectUrl) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.muted = true; video.preload = 'auto'; video.playsInline = true;
+    if (!isObjectUrl) video.crossOrigin = 'anonymous';
+    let done = false;
+    const cleanup = () => {
+      try { video.pause(); } catch (_) {}
+      try { video.removeAttribute('src'); video.load(); } catch (_) {}
+    };
+    const finish = (v) => { if (done) return; done = true; clearTimeout(timer); cleanup(); resolve(v); };
+    const timer = setTimeout(() => finish(null), 6000);
+    video.addEventListener('loadedmetadata', () => {
+      const d = video.duration;
+      const t = (isFinite(d) && d > 0) ? Math.min(0.1, d / 2) : 0.1;
+      try { video.currentTime = t; } catch (_) {}
+    }, { once:true });
+    video.addEventListener('seeked', () => {
+      const vw = video.videoWidth, vh = video.videoHeight;
+      if (!vw || !vh) { finish(null); return; }
+      const scale = Math.min(1, maxEdge / Math.max(vw, vh));
+      const cw = Math.max(1, Math.round(vw * scale));
+      const ch = Math.max(1, Math.round(vh * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      try {
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, cw, ch);
+      } catch (_) { finish(null); return; }
+      try {
+        canvas.toBlob((blob) => {
+          if (!blob) { finish(null); return; }
+          finish({ url: URL.createObjectURL(blob), w: vw, h: vh });
+        }, 'image/jpeg', 0.78);
+      } catch (_) {
+        finish(_POSTER_TAINTED); // tainted canvas → caller retries same-origin
+      }
+    }, { once:true });
+    video.addEventListener('error', () => finish(null), { once:true });
+    video.src = srcUrl;
+    try { video.load(); } catch (_) {}
+  });
+}
+async function _captureVideoPosterNow(entry, maxEdge) {
+  // Fast path: stream via the range-capable asset protocol (desktop) with a
+  // clean (CORS) canvas. If that fails for any reason — tainted canvas OR a
+  // load error (asset scheme without CORS headers rejects crossOrigin) — fall
+  // back to a same-origin object URL, which is guaranteed untainted but pulls
+  // the whole file.
+  if (entry && entry.abs && typeof window.__fgAssetUrl === 'function') {
+    const r = await _grabVideoFrame(window.__fgAssetUrl(entry.abs), maxEdge, false);
+    if (r && r !== _POSTER_TAINTED) return r; // clean success only
+  }
+  const file = await getFileForEntry(entry);
+  const url = URL.createObjectURL(file);
+  try {
+    const r = await _grabVideoFrame(url, maxEdge, true);
+    return (r && r !== _POSTER_TAINTED) ? r : null;
+  } finally {
+    try { URL.revokeObjectURL(url); } catch (_) {}
+  }
+}
+function captureVideoPoster(entry, maxEdge, signal) {
+  return new Promise((resolve) => {
+    _videoPosterQueue.push(() => signal?.aborted ? resolve(null) :
+      _captureVideoPosterNow(entry, maxEdge).then(resolve, () => resolve(null)));
+    _drainVideoPosterQueue();
+  });
+}
+
 function loadThumbForNode(node, i, img) {
-  if (img._loadedForIndex === i && img.src) return;
+  const entry = files[i];
+  if (img._loadedForEntry === entry && (img.src || img._thumbPending)) return;
+  node._thumbAbort?.abort();
+  const controller = node._thumbAbort = new AbortController();
+  const generation = fileGeneration;
+  const current = () => !controller.signal.aborted && node._thumbAbort === controller &&
+    generation === fileGeneration && files[i] === entry;
+  const markLoaded = () => {
+    if (current()) { node.classList.remove('errored'); node.classList.add('loaded'); }
+  };
   img._loadedForIndex = i;
+  img._loadedForEntry = entry;
+  img._thumbPending = true;
   // Don't revoke the tile's own url — it's owned by the cache now.
   img._objectUrl = null;
-
-  const entry = files[i];
 
   // Reset placeholder state for the tile.
   const tile = node;
   tile.classList.remove('loaded', 'errored');
+
+  // Video tiles: capture a poster frame client-side (Rust can't decode video).
+  // Cached in the same LRU as image thumbs so re-scroll doesn't re-decode.
+  if (entry && isVideo(entry.name)) {
+    const cachedV = thumbUrlByIdx.get(i);
+    if (cachedV) {
+      img._thumbPending = false;
+      img.alt = entry.name;
+      img.onerror = () => { if (current()) tile.classList.add('errored'); };
+      img.addEventListener('load', markLoaded, { once:true });
+      img.src = cachedV;
+      return;
+    }
+    captureVideoPoster(entry, 512, controller.signal).then((res) => {
+      if (!current()) {
+        if (res && res.url) { try { URL.revokeObjectURL(res.url); } catch (_) {} }
+        return;
+      }
+      img._thumbPending = false;
+      if (!res) { tile.classList.add('errored'); return; }
+      if (res.w && res.h && !dims[i]) dims[i] = { w: res.w, h: res.h };
+      rememberThumbUrl(i, res.url);
+      img.alt = entry.name;
+      img.onerror = () => { if (current()) tile.classList.add('errored'); };
+      img.addEventListener('load', markLoaded, { once:true });
+      img.src = res.url;
+    });
+    return;
+  }
 
   // Desktop fast path: request a downscaled JPEG thumb from Rust. Cached in
   // memory (LRU) so back-and-forth scrolling doesn't re-hit Rust.
   if (entry && entry.handle && entry.handle._rootId && typeof window.__fgThumbUrl === 'function') {
     const cached = thumbUrlByIdx.get(i);
     if (cached) {
+      img._thumbPending = false;
       img.alt = entry.name;
-      img.onerror = () => { if (img._loadedForIndex === i) tile.classList.add('errored'); };
-      img.addEventListener('load', () => {
-        if (img._loadedForIndex === i) tile.classList.add('loaded');
-      }, { once:true });
+      img.onerror = () => { if (current()) tile.classList.add('errored'); };
+      img.addEventListener('load', markLoaded, { once:true });
       img.src = cached;
       return;
     }
     (async () => {
-      const url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 512);
-      if (img._loadedForIndex !== i) {
+      const url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 512, { signal:controller.signal });
+      if (!current()) {
         if (url) URL.revokeObjectURL(url);
         return;
       }
+      img._thumbPending = false;
       if (!url) { tile.classList.add('errored'); return; }
       rememberThumbUrl(i, url);
       img.alt = entry.name;
       img.onerror = () => {
-        if (img._loadedForIndex === i) tile.classList.add('errored');
+        if (current()) tile.classList.add('errored');
       };
       img.addEventListener('load', async () => {
-        if (img._loadedForIndex !== i) return;
-        tile.classList.add('loaded');
+        if (!current()) return;
+        markLoaded();
         try { if (img.decode) await img.decode(); } catch (_) {}
-        if (!colors[i]) {
+        if (current() && !colors[i]) {
           const sig = computeColorSignature(img);
           if (sig) colors[i] = sig;
         }
@@ -2772,25 +3369,26 @@ function loadThumbForNode(node, i, img) {
 
   (async () => {
     try {
-      const file = await getFileForEntry(files[i]);
-      if (img._loadedForIndex !== i) return;
+      const file = await getFileForEntry(entry);
+      if (!current()) return;
+      img._thumbPending = false;
       const url = URL.createObjectURL(file);
       img._objectUrl = url;
-      img.alt = files[i].name;
+      img.alt = entry.name;
       img.onerror = () => {
-        if (img._loadedForIndex === i) tile.classList.add('errored');
+        if (current()) tile.classList.add('errored');
       };
       img.addEventListener('load', async () => {
-        if (img._loadedForIndex !== i) return;
-        tile.classList.add('loaded');
+        if (!current()) return;
+        markLoaded();
         try { if (img.decode) await img.decode(); } catch (_) {}
-        if (!colors[i]) {
+        if (current() && !colors[i]) {
           const sig = computeColorSignature(img);
           if (sig) colors[i] = sig;
         }
       }, { once:true });
       img.src = url;
-    } catch (_) { tile.classList.add('errored'); }
+    } catch (_) { if (current()) { img._thumbPending = false; tile.classList.add('errored'); } }
   })();
 }
 
@@ -2814,11 +3412,11 @@ function renderVisible() {
     const slot = slotsByTop[i];
     if (slot.top > bottomPx) break;
     if (slot.top + slot.height < topPx) continue;
-    seen.add(slot.k);
-    let node = mounted.get(slot.k);
+    seen.add(slot.index);
+    let node = mounted.get(slot.index);
     if (!node) {
       node = pool.pop() || makeTileNode();
-      mounted.set(slot.k, node);
+      mounted.set(slot.index, node);
     }
     node.style.left   = slot.left  + "px";
     node.style.top    = slot.top   + "px";
@@ -2849,7 +3447,7 @@ function saveScrollAnchor() {
   const start = firstVisibleSlotIndex(scrollY);
   for (let i = start; i < slotsByTop.length; i++) {
     const s = slotsByTop[i];
-    if (mounted.has(s.k)) return { index: s.index, offsetY: s.top - scrollY };
+    if (mounted.has(s.index)) return { index: s.index, offsetY: s.top - scrollY };
   }
   return null;
 }
@@ -2863,12 +3461,8 @@ function restoreScrollAnchor(anchor) {
 
 function rebuildLayout(preserveScroll = true) {
   const anchor = preserveScroll ? saveScrollAnchor() : null;
-  for (const [, node] of mounted) {
-    if (node.parentNode) node.parentNode.removeChild(node);
-    resetTileNode(node);
-    if (pool.length < 300) pool.push(node);
-  }
-  mounted.clear();
+  // Reconcile against the new slots in place. Clearing all mounted tiles here
+  // made every dimension-scan update flash already-loaded images as LOADING.
   computeSlots();
   if (anchor) restoreScrollAnchor(anchor);
   renderVisible();
@@ -2937,7 +3531,9 @@ async function downloadIndex(i) {
 // Delete
 // =====================================================================
 let confirmPending = null;
+let confirmReturnFocus = null;
 function openConfirmModal({title, message, listItems, dangerLabel, onConfirm, isDanger}) {
+  if (!confirmModal.classList.contains('open')) confirmReturnFocus = document.activeElement;
   confirmTitle.textContent = title || "Confirm";
   confirmMsg.innerHTML = message || "";
   confirmList.textContent = (listItems && listItems.length) ? listItems.join("\n") : "";
@@ -2949,13 +3545,41 @@ function openConfirmModal({title, message, listItems, dangerLabel, onConfirm, is
   confirmPending = onConfirm || null;
   confirmModal.classList.add('open');
   confirmModal.setAttribute('aria-hidden', 'false');
-  setTimeout(() => confirmCancel.focus(), 0);
+  confirmCancel.focus();
 }
 function closeConfirmModal() {
   confirmModal.classList.remove('open');
   confirmModal.classList.remove('danger');
   confirmModal.setAttribute('aria-hidden', 'true');
   confirmPending = null;
+  const previous = confirmReturnFocus;
+  confirmReturnFocus = null;
+  if (previous?.isConnected) previous.focus();
+}
+function handleConfirmKeydown(e) {
+  if (!confirmModal.classList.contains('open')) return false;
+  e.stopPropagation();
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const buttons = [confirmCancel, confirmOk].filter(button => !button.disabled);
+    const index = buttons.indexOf(document.activeElement);
+    const next = index < 0 ? (e.shiftKey ? buttons.length - 1 : 0) :
+      (index + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length;
+    buttons[next]?.focus();
+  } else if (e.key === 'Enter' || e.key === ' ') {
+    // Let the browser activate the focused button. Enter on Cancel must cancel,
+    // and focus outside the dialog must never turn into implicit confirmation.
+    const onButton = e.target === confirmCancel || e.target === confirmOk;
+    if (e.repeat || !onButton) e.preventDefault();
+    if (!onButton) confirmCancel.focus();
+  } else if (e.key === 'Escape' || e.key === 'n' || e.key === 'N') {
+    e.preventDefault();
+    closeConfirmModal();
+  } else if (e.key === 'y' || e.key === 'Y') {
+    e.preventDefault();
+    if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) confirmOk.click();
+  }
+  return true;
 }
 confirmCancel.addEventListener('click', closeConfirmModal);
 confirmModal.addEventListener('click', (e) => {
@@ -2975,30 +3599,71 @@ async function deleteEntryFromDisk(entry) {
   try {
     await entry.parent.removeEntry(entry.name);
     return { ok: true };
-  } catch (err) {
-    return { ok: false, reason: (err && err.name) || "error", err };
+  } catch (_) {
+    // Native errors may contain absolute paths. Keep them out of UI/logs.
+    return { ok: false };
   }
 }
 
+let deleteInProgress = false;
+function showDeleteNotice(message, state = 'done') {
+  deleteToastText.textContent = message;
+  deleteToast.dataset.state = state;
+  deleteToast.style.display = 'flex';
+}
+
 async function performDeleteIndexes(indexes) {
+  if (deleteInProgress) return;
+  const generation = fileGeneration;
+  const root = currentRootHandle;
+  const isCurrent = () => generation === fileGeneration && root === currentRootHandle;
   const uniq = Array.from(new Set(indexes.filter(isValidIndex))).sort((a,b) => a - b);
   if (!uniq.length) return;
-  const results = { diskOk: 0, diskFail: 0, listOnly: 0, failedNames: [] };
+  const results = { diskOk: 0, diskFail: 0, listOnly: 0 };
+  const removeSet = new Set();
+  deleteInProgress = true;
+  showDeleteNotice('Deleting…', 'busy');
 
-  for (const i of uniq) {
-    const entry = files[i];
-    if (canDeleteFromDisk(entry)) {
-      const r = await deleteEntryFromDisk(entry);
-      if (r.ok) results.diskOk++;
-      else { results.diskFail++; results.failedNames.push(entry.name + ": " + r.reason); }
-    } else {
-      results.listOnly++;
+  try {
+    for (const i of uniq) {
+      if (!isCurrent()) return;
+      const entry = files[i];
+      if (canDeleteFromDisk(entry)) {
+        const r = await deleteEntryFromDisk(entry);
+        if (!isCurrent()) return;
+        if (r.ok) { results.diskOk++; removeSet.add(i); }
+        else results.diskFail++;
+      } else {
+        // Explicitly disclosed in the confirmation for browser-only drops.
+        results.listOnly++;
+        removeSet.add(i);
+      }
+    }
+
+    // An entirely failed batch leaves grid, viewer, selection and caches alone.
+    if (removeSet.size) removeDeletedEntries(removeSet);
+    const parts = [];
+    if (results.diskOk) parts.push(`Deleted ${results.diskOk} file${results.diskOk === 1 ? '' : 's'} from disk.`);
+    if (results.listOnly) parts.push(`Removed ${results.listOnly} file${results.listOnly === 1 ? '' : 's'} from the gallery only.`);
+    if (results.diskFail) parts.push(`Couldn't delete ${results.diskFail} file${results.diskFail === 1 ? '' : 's'}. Failed files remain in the gallery. Check folder permissions or whether a file is in use, then try again.`);
+    showDeleteNotice(parts.join(' '), results.diskFail ? 'error' : 'done');
+  } catch (_) {
+    showDeleteNotice('Deletion could not finish. Reopen the folder to refresh its contents before retrying.', 'error');
+  } finally {
+    deleteInProgress = false;
+    if (deleteToast.dataset.state === 'busy') deleteToast.style.display = 'none';
+    if (_fgRefreshQueued && !_fgRefreshInFlight) {
+      _fgRefreshQueued = false;
+      setTimeout(refreshFilesFromRoot, 0);
     }
   }
+}
 
-  const removeSet = new Set(uniq);
+function removeDeletedEntries(removeSet) {
+  const viewerIndex = currentIndex;
+  invalidateFileWork();
   let favTouched = false;
-  for (const i of uniq) {
+  for (const i of removeSet) {
     const p = files[i]?.path;
     if (p && favorites.has(p)) { favorites.delete(p); favTouched = true; }
   }
@@ -3017,9 +3682,9 @@ async function performDeleteIndexes(indexes) {
   };
   files = keep.map(i => files[i]);
   dims = remapArr(dims);
-  dimsP = remapArr(dimsP);
+  dimsP = new Array(keep.length);
   prompts = remapArr(prompts);
-  promptsP = remapArr(promptsP);
+  promptsP = new Array(keep.length);
   colors = remapArr(colors);
 
   const newSelected = new Set();
@@ -3039,28 +3704,31 @@ async function performDeleteIndexes(indexes) {
   renderFolderStrip();
   updateSelectionUI();
   applyFilters();
+  if (files.length) ensureFirstDimsInBackground(Math.min(400, files.length));
+  if (prefetchActive && files.length) startPrefetchPrompts();
+  if (prefetchColorsActive && files.length) startPrefetchColors();
 
   if (viewer.classList.contains('open')) {
     if (!files.length) {
       closeViewer();
     } else {
-      const nextPos = Math.min(currentViewPos, (view.length ? view.length - 1 : 0));
+      // A failed deletion (or deletion of another item) keeps the same image.
+      const retainedPos = view.indexOf(idxMap.get(viewerIndex));
+      const nextPos = retainedPos >= 0 ? retainedPos : Math.min(currentViewPos, (view.length ? view.length - 1 : 0));
       if (view.length) openViewer(view[nextPos], nextPos);
       else closeViewer();
     }
   }
 
-  if (results.diskFail) {
-    console.warn("Delete failures:", results.failedNames);
-  }
-  if (results.listOnly && !results.diskOk && !results.diskFail) {
-    console.warn("Removed from gallery only (no filesystem handle).");
-  }
 }
 
 function confirmAndDeleteIndexes(indexes) {
+  if (deleteInProgress) { showDeleteNotice('Deletion is in progress. Please wait.', 'busy'); return; }
   const uniq = Array.from(new Set(indexes.filter(isValidIndex)));
   if (!uniq.length) return;
+  const generation = fileGeneration;
+  const root = currentRootHandle;
+  const entries = uniq.map(i => files[i]);
   const n = uniq.length;
   const diskCount = uniq.filter(i => canDeleteFromDisk(files[i])).length;
   const listOnly = n - diskCount;
@@ -3082,7 +3750,13 @@ function confirmAndDeleteIndexes(indexes) {
     message: parts.join("<br>"),
     listItems: [names.join("\n") + extra],
     dangerLabel: n === 1 ? "Delete" : `Delete ${n}`,
-    onConfirm: () => performDeleteIndexes(uniq),
+    onConfirm: () => {
+      if (generation !== fileGeneration || root !== currentRootHandle || uniq.some((i, k) => files[i] !== entries[k])) {
+        showDeleteNotice('The folder contents changed. Select the images again before deleting.', 'error');
+        return;
+      }
+      return performDeleteIndexes(uniq);
+    },
   });
 }
 
@@ -3090,15 +3764,22 @@ function confirmAndDeleteIndexes(indexes) {
 // Viewer (canvas)
 // =====================================================================
 let bmp = null, bmpW = 1, bmpH = 1, isFullRes = false;
+let fullResLimited = false;
 let zoomS = 1, baseScale = 1, panX = 0, panY = 0;
 let viewerRotation = 0;
-const ZMIN = 1, ZMAX = 10;
+const ZMIN = 0.05, ZMAX = 32;
 let dragging = false, dragStartX = 0, dragStartY = 0, dragStartPanX = 0, dragStartPanY = 0;
 
 let viewerOverlayUrl = "";
+let viewerVideoUrl = "";  // browser object URL for the viewer <video> (revoke on hide)
+let videoMuted = (localStorage.getItem('fast_gallery_muted') ?? '1') === '1'; // default muted
 function useImgOverlay(i) {
   if (!isValidIndex(i)) return false;
   const f = files[i]; if (!f) return false;
+  const d = dims[i];
+  // Giant animated images also need a bounded static preview. An <img>
+  // overlay would bypass the viewer budget and decode the original outright.
+  if (!d || d._unknown || d.w * d.h > PREVIEW_MAX_PIXELS) return false;
   const ext = String(f.ext || "").toLowerCase();
   if (ext === 'gif') return true;
   if (ext === 'webp') {
@@ -3109,12 +3790,19 @@ function useImgOverlay(i) {
 }
 function hideImgOverlay() {
   viewerImgOverlay.style.display = 'none';
+  viewerImgOverlay.style.transform = '';
   viewerImgOverlay.removeAttribute('src');
   viewerCanvas.style.display = '';
   if (viewerOverlayUrl) {
     try { URL.revokeObjectURL(viewerOverlayUrl); } catch (_) {}
     viewerOverlayUrl = "";
   }
+}
+function resetOverlayView() {
+  const d = dims[currentIndex];
+  if (d) { bmpW=d.w; bmpH=d.h; baseScale=computeBaseScale(); }
+  zoomS=1;panX=0;panY=0;
+  viewer.classList.remove('loading');drawViewer();
 }
 function showImgOverlay(file) {
   try {
@@ -3126,6 +3814,7 @@ function showImgOverlay(file) {
     viewerImgOverlay.src = viewerOverlayUrl;
     viewerImgOverlay.style.display = 'block';
     viewerCanvas.style.display = 'none';
+    resetOverlayView();
   } catch (_) {}
 }
 function showImgOverlayUrl(url) {
@@ -3136,6 +3825,47 @@ function showImgOverlayUrl(url) {
   viewerImgOverlay.src = url;
   viewerImgOverlay.style.display = 'block';
   viewerCanvas.style.display = 'none';
+  resetOverlayView();
+}
+
+// ---- Video overlay (mp4/webm) ----------------------------------------------
+// Parallel to the <img> overlay: a persistent <video controls> element. No
+// autoplay — playback starts on pointerenter (see wiring below). Mute is a
+// global, persisted preference applied to every video.
+function useVideoOverlay(i) { return isValidIndex(i) && isVideoIndex(i); }
+function applyMuteState() {
+  try { viewerVideoOverlay.muted = videoMuted; } catch (_) {}
+  if (viewerMute) {
+    setActionIcon(viewerMute, videoMuted ? 'muted' : 'volume');
+    viewerMute.classList.toggle('on', !videoMuted);
+    viewerMute.title = videoMuted ? 'Unmute video (M)' : 'Mute video (M)';
+    viewerMute.setAttribute('aria-label', viewerMute.title);
+  }
+}
+function hideVideoOverlay() {
+  try { viewerVideoOverlay.pause(); } catch (_) {}
+  try { viewerVideoOverlay.removeAttribute('src'); viewerVideoOverlay.load(); } catch (_) {}
+  viewerVideoOverlay.style.display = 'none';
+  if (viewerVideoUrl) { try { URL.revokeObjectURL(viewerVideoUrl); } catch (_) {} viewerVideoUrl = ""; }
+  viewerCanvas.style.display = '';
+}
+function _showVideoCommon() {
+  applyMuteState();
+  viewerImgOverlay.style.display = 'none';
+  viewerCanvas.style.display = 'none';
+  viewerVideoOverlay.style.display = 'block';
+  viewer.classList.remove('loading');
+}
+function showVideoOverlayUrl(url) {   // desktop: range-capable asset URL, no bytes in JS
+  if (viewerVideoUrl) { try { URL.revokeObjectURL(viewerVideoUrl); } catch (_) {} viewerVideoUrl = ""; }
+  viewerVideoOverlay.src = url;
+  _showVideoCommon();
+}
+function showVideoOverlay(file) {     // browser: object URL
+  if (viewerVideoUrl) { try { URL.revokeObjectURL(viewerVideoUrl); } catch (_) {} viewerVideoUrl = ""; }
+  viewerVideoUrl = URL.createObjectURL(file);
+  viewerVideoOverlay.src = viewerVideoUrl;
+  _showVideoCommon();
 }
 
 function setZoomClasses() { viewer.classList.toggle('zoomed', zoomS > 1.0001); viewer.classList.toggle('dragging', dragging); }
@@ -3148,10 +3878,10 @@ function computeBaseScale() {
   return Math.min(r.w / w, r.h / h);
 }
 function clampPan() {
-  if (zoomS <= 1.0001) { panX = 0; panY = 0; return; }
   const r = stageRect(); const s = baseScale * zoomS;
-  const imgW = bmpW * s, imgH = bmpH * s;
-  const maxX = Math.max(0, (imgW - r.w)/2), maxY = Math.max(0, (imgH - r.h)/2);
+  const quarterTurn = Math.abs(viewerRotation % 180) === 90;
+  const imgW = (quarterTurn ? bmpH : bmpW) * s, imgH = (quarterTurn ? bmpW : bmpH) * s;
+  const maxX = imgW / 2, maxY = imgH / 2;
   panX = clamp(panX, -maxX, maxX); panY = clamp(panY, -maxY, maxY);
 }
 function resizeViewerCanvas() {
@@ -3167,7 +3897,15 @@ function drawViewer() {
   const r = stageRect(); const dpr = window.devicePixelRatio || 1;
   vctx.setTransform(dpr,0,0,dpr,0,0);
   vctx.fillStyle = "#000"; vctx.fillRect(0, 0, r.w, r.h);
-  if (!bmp) return;
+  if (!bmp) {
+    if (viewerImgOverlay.style.display === 'block') {
+      clampPan();
+      const fit = Math.min(r.w/bmpW,r.h/bmpH);
+      viewerImgOverlay.style.transform = `translate(${panX}px,${panY}px) scale(${baseScale*zoomS/fit}) rotate(${viewerRotation}deg)`;
+      setZoomClasses();
+    }
+    return;
+  }
   clampPan();
   const s = baseScale * zoomS;
   vctx.save();
@@ -3194,6 +3932,7 @@ function zoomAt(cx, cy, factor) {
 
 viewerStage.addEventListener('wheel', (e) => {
   if (!viewer.classList.contains('open')) return;
+  if (useVideoOverlay(currentIndex)) return; // video: no zoom, let events pass to controls
   e.preventDefault(); e.stopPropagation();
   zoomAt(e.clientX, e.clientY, Math.pow(1.0015, -e.deltaY));
 }, { passive:false });
@@ -3204,8 +3943,9 @@ function scheduleDragDraw() {
 }
 viewerStage.addEventListener('pointerdown', (e) => {
   if (!viewer.classList.contains('open')) return;
+  if (useVideoOverlay(currentIndex)) return; // let the <video> controls (play, scrub) handle pointers
+  if (e.button !== 0 || e.target.closest('button, input, select, #viewerFilmstrip, .filmstripWrap')) return;
   e.preventDefault(); e.stopPropagation();
-  if (zoomS <= 1.0001) return;
   dragging = true;
   dragStartX = e.clientX; dragStartY = e.clientY;
   dragStartPanX = panX; dragStartPanY = panY;
@@ -3229,10 +3969,10 @@ function endDrag(e) {
 }
 viewerStage.addEventListener('pointerup', endDrag);
 viewerStage.addEventListener('pointercancel', endDrag);
-viewerStage.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
-viewer.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+viewerStage.addEventListener('click', e => { if (useVideoOverlay(currentIndex)) return; e.preventDefault(); e.stopPropagation(); });
+viewer.addEventListener('click', e => { if (e.target === viewerVideoOverlay) return; e.preventDefault(); e.stopPropagation(); });
 
-const decodeWorker = (() => {
+function createDecodeWorker() {
   if (!window.Worker || !window.createImageBitmap) return null;
   const code = `
     self.onmessage = async (e) => {
@@ -3241,8 +3981,8 @@ const decodeWorker = (() => {
         let bmp;
         const opts = { imageOrientation: "from-image" };
         if (rw && rh) {
-          try { bmp = await createImageBitmap(file, { ...opts, resizeWidth:rw, resizeHeight:rh, resizeQuality: quality||"high" }); }
-          catch (err) { bmp = await createImageBitmap(file, opts); }
+          // A failed bounded decode must not retry at unrestricted resolution.
+          bmp = await createImageBitmap(file, { ...opts, resizeWidth:rw, resizeHeight:rh, resizeQuality: quality||"high" });
         } else { bmp = await createImageBitmap(file, opts); }
         self.postMessage({ reqId, ok:true, bmp, w:bmp.width, h:bmp.height }, [bmp]);
       } catch (err) { self.postMessage({ reqId, ok:false, error:String(err) }); }
@@ -3250,9 +3990,23 @@ const decodeWorker = (() => {
   `;
   const blob = new Blob([code], { type:"application/javascript" });
   const url = URL.createObjectURL(blob);
-  const w = new Worker(url); w._url = url; return w;
-})();
+  try { const w = new Worker(url); w._url = url; return w; }
+  catch (_) { URL.revokeObjectURL(url); return null; }
+}
+let decodeWorker = null;
+let viewerDecodeAbort = null;
+let viewerOpenId = 0;
 let decodeReqId = 0, activeReqId = 0;
+function cancelViewerDecode() {
+  activeReqId = ++decodeReqId;
+  if (viewerDecodeAbort) { viewerDecodeAbort.abort(); viewerDecodeAbort = null; }
+  if (decodeWorker) {
+    decodeWorker._cancel?.();
+    decodeWorker.terminate();
+    URL.revokeObjectURL(decodeWorker._url);
+    decodeWorker = null;
+  }
+}
 function closeBitmap(b) { try { if (b && b.close) b.close(); } catch (_) {} }
 function setBadge(text, show) { viewerBadge.textContent = text || ""; viewerBadge.classList.toggle('show', !!show); }
 function computePreviewResize(i) {
@@ -3269,136 +4023,136 @@ function computePreviewResize(i) {
   return { rw, rh, downscaled: (rw < d.w) || (rh < d.h) };
 }
 
-async function tryRustPreview(i, reqId) {
-  const entry = files[i];
-  if (!entry || !entry.handle || !entry.handle._rootId) return false;
-  if (typeof window.__fgThumbUrl !== 'function') return false;
+async function decodeNativePreview(entry, target, signal) {
+  let url = "";
   try {
-    const url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 2048);
-    if (!url) return false;
-    if (reqId !== activeReqId) { URL.revokeObjectURL(url); return true; }
-    // Decode the downscaled JPEG — always small enough for createImageBitmap.
+    url = await window.__fgPreviewUrl(entry.handle._rootId, entry.handle._rel,
+      Math.max(target.rw, target.rh), target.rw * target.rh, { signal });
+    if (signal.aborted) throw new DOMException('Canceled', 'AbortError');
+    if (!url) throw new Error('Native preview unavailable');
     const res = await fetch(url);
     const blob = await res.blob();
-    URL.revokeObjectURL(url);
-    const b = await createImageBitmap(blob);
-    if (reqId !== activeReqId) { closeBitmap(b); return true; }
-    bmp = b; bmpW = b.width; bmpH = b.height;
-    isFullRes = false;
-    viewer.classList.remove('loading');
+    if (signal.aborted) throw new DOMException('Canceled', 'AbortError');
+    return await createImageBitmap(blob);
+  } finally { if (url) URL.revokeObjectURL(url); }
+}
+
+function decodeBrowserBitmap(file, target) {
+  const opts = { imageOrientation:'from-image' };
+  if (target.downscaled) Object.assign(opts, { resizeWidth:target.rw, resizeHeight:target.rh, resizeQuality:'high' });
+  const worker = createDecodeWorker();
+  if (!worker) return createImageBitmap(file, opts);
+  decodeWorker = worker;
+  return new Promise((resolve, reject) => {
+    worker._cancel = () => reject(new DOMException('Canceled', 'AbortError'));
+    const finish = () => {
+      worker._cancel = null;
+      worker.terminate();
+      URL.revokeObjectURL(worker._url);
+      if (decodeWorker === worker) decodeWorker = null;
+    };
+    worker.onmessage = e => {
+      finish();
+      if (e.data?.ok) resolve(e.data.bmp);
+      else reject(new Error('Bitmap decode failed'));
+    };
+    worker.onerror = e => { e.preventDefault(); finish(); reject(new Error('Bitmap worker failed')); };
+    try { worker.postMessage({ file, rw:target.downscaled ? target.rw : 0, rh:target.downscaled ? target.rh : 0, quality:'high' }); }
+    catch (_) { finish(); reject(new Error('Bitmap worker unavailable')); }
+  });
+}
+
+function computeDecodeTarget(i, wantFullRes) {
+  if (!wantFullRes) return computePreviewResize(i);
+  const d = dims[i] || { w:1, h:1 };
+  const scale = Math.min(1, 16384 / Math.max(d.w, d.h), Math.sqrt(FULLRES_MAX_PIXELS / (d.w * d.h)));
+  const rw = Math.max(1, Math.floor(d.w * scale));
+  const rh = Math.max(1, Math.floor(d.h * scale));
+  return { rw, rh, downscaled:rw < d.w || rh < d.h };
+}
+
+async function showCachedViewerPreview(i, current) {
+  const url = thumbUrlByIdx.get(i);
+  if (!url || bmp) return;
+  try {
+    const blob = await (await fetch(url)).blob();
+    const small = await createImageBitmap(blob);
+    if (!current() || bmp) { closeBitmap(small); return; }
+    bmp = small; bmpW = small.width; bmpH = small.height;
     baseScale = computeBaseScale();
-    zoomS = 1; panX = 0; panY = 0; dragging = false;
+    zoomS = 1; panX = 0; panY = 0;
     drawViewer();
-    updateViewerButtons(i);
-    setBadge(`Rescued preview ${bmpW}×${bmpH}`, true);
-    return true;
-  } catch (_) { return false; }
+    setBadge('Preview', true);
+  } catch (_) {} // An evicted cache URL must not prevent the real decode.
 }
 
 async function startDecode(i, wantFullRes) {
   if (!hasViewerCanvas || !isValidIndex(i)) return;
-  activeReqId = ++decodeReqId;
+  cancelViewerDecode();
   const reqId = activeReqId;
+  const entry = files[i];
+  const generation = fileGeneration;
+  const controller = viewerDecodeAbort = new AbortController();
+  const current = () => reqId === activeReqId && generation === fileGeneration &&
+    files[i] === entry && currentIndex === i && viewer.classList.contains('open');
   viewer.classList.add('loading');
-  closeBitmap(bmp);
-  bmp = null; bmpW = 1; bmpH = 1;
-  drawViewer();
-  let file;
-  try { file = await getFileForEntry(files[i]); }
-  catch (err) { viewer.classList.remove('loading'); setBadge("Decode failed", true); onFileAccessError(err); return; }
-
-  let cap = null;
-  if (wantFullRes === true) {
-    const d = dims[i];
-    if (d && d.w > 0 && d.h > 0 && (d.w * d.h) > FULLRES_MAX_PIXELS) {
-      const s = Math.sqrt(FULLRES_MAX_PIXELS / (d.w * d.h));
-      const rw = Math.max(1, Math.floor(d.w * s));
-      const rh = Math.max(1, Math.floor(d.h * s));
-      cap = { rw, rh, sw: d.w, sh: d.h };
+  showCachedViewerPreview(i, current);
+  const target = computeDecodeTarget(i, wantFullRes);
+  const native = entry.handle?._rootId && typeof window.__fgPreviewUrl === 'function' &&
+    /^(png|jpe?g|webp|gif|bmp)$/.test(entry.ext);
+  const large = (dims[i]?.w || 0) * (dims[i]?.h || 0) > PREVIEW_MAX_PIXELS || entry.size >= 32 * 1024 * 1024;
+  let decoded;
+  try {
+    if (native && large) {
+      decoded = await decodeNativePreview(entry, target, controller.signal);
+    } else {
+      try {
+        const file = await getFileForEntry(entry);
+        if (!current()) return;
+        decoded = await decodeBrowserBitmap(file, target);
+      } catch (err) {
+        if (!current()) return;
+        if (!native) throw err;
+        decoded = await decodeNativePreview(entry, target, controller.signal);
+      }
     }
-  }
-
-  if (!decodeWorker) {
-    try {
-      let b;
-      const opts = { imageOrientation:"from-image" };
-      if (cap) {
-        try { b = await createImageBitmap(file, { ...opts, resizeWidth:cap.rw, resizeHeight:cap.rh, resizeQuality:"high" }); }
-        catch (_) { b = await createImageBitmap(file, opts); }
-        isFullRes = false;
-      } else if (!wantFullRes && window.createImageBitmap) {
-        const pr = computePreviewResize(i);
-        try { b = await createImageBitmap(file, { ...opts, resizeWidth:pr.rw, resizeHeight:pr.rh, resizeQuality:"high" }); }
-        catch (_) { b = await createImageBitmap(file, opts); }
-        isFullRes = !pr.downscaled;
-      } else { b = await createImageBitmap(file, opts); isFullRes = true; }
-      if (reqId !== activeReqId) { closeBitmap(b); return; }
-      bmp = b; bmpW = b.width; bmpH = b.height;
-      const d = dims[i];
-      if (d && d.w > 1 && d.h > 1 && !cap) isFullRes = (bmpW === d.w && bmpH === d.h);
-      viewer.classList.remove('loading');
-      baseScale = computeBaseScale();
-      zoomS = 1; panX = 0; panY = 0; dragging = false;
-      drawViewer();
-      updateViewerButtons(i);
-      if (cap) setBadge(`Capped ${cap.sw}×${cap.sh} → ${bmpW}×${bmpH}`, true);
-    } catch (err) {
-      // Chromium's createImageBitmap can't handle very large images (>~256 Mpx
-      // on Windows). Fall back to a Rust-side downscaled preview so the user
-      // at least sees something instead of a black canvas.
-      const rescued = await tryRustPreview(i, reqId);
-      if (rescued) return;
-      viewer.classList.remove('loading');
-      setBadge("Decode failed", true);
-    }
-    return;
-  }
-  let msg;
-  if (cap) {
-    isFullRes = false;
-    msg = { reqId, file, rw:cap.rw, rh:cap.rh, quality:"high" };
-  } else if (wantFullRes) {
-    isFullRes = true;
-    msg = { reqId, file, rw:0, rh:0, quality:"high" };
-  } else {
-    const pr = computePreviewResize(i);
-    isFullRes = !pr.downscaled;
-    msg = { reqId, file, rw:pr.rw, rh:pr.rh, quality:"high" };
-  }
-  decodeWorker._capByReq = decodeWorker._capByReq || new Map();
-  if (cap) decodeWorker._capByReq.set(reqId, cap);
-  decodeWorker.postMessage(msg);
-}
-if (decodeWorker) {
-  decodeWorker.onmessage = (e) => {
-    const { reqId, ok, bmp:b, w, h } = e.data || {};
-    const capMap = decodeWorker._capByReq;
-    const cap = capMap ? capMap.get(reqId) : null;
-    if (capMap) capMap.delete(reqId);
-    if (reqId !== activeReqId) { if (ok) closeBitmap(b); return; }
-    if (!viewer.classList.contains('open')) { if (ok) closeBitmap(b); return; }
-    if (!ok) { viewer.classList.remove('loading'); setBadge("Decode failed", true); return; }
-    bmp = b; bmpW = w || b.width || 1; bmpH = h || b.height || 1;
-    const d = dims[currentIndex];
-    if (d && d.w > 1 && d.h > 1 && !cap) isFullRes = (bmpW === d.w && bmpH === d.h);
-    viewer.classList.remove('loading');
+    if (!current()) { closeBitmap(decoded); return; }
+    closeBitmap(bmp);
+    bmp = decoded; bmpW = decoded.width; bmpH = decoded.height;
+    isFullRes = !target.downscaled;
+    fullResLimited = !!wantFullRes && target.downscaled;
     baseScale = computeBaseScale();
     zoomS = 1; panX = 0; panY = 0; dragging = false;
     drawViewer();
-    updateViewerButtons(currentIndex);
-    if (cap) setBadge(`Capped ${cap.sw}×${cap.sh} → ${bmpW}×${bmpH}`, true);
-  };
+    updateViewerButtons(i);
+    if (fullResLimited) setBadge(`Capped ${dims[i].w}×${dims[i].h} → ${bmpW}×${bmpH}`, true);
+  } catch (err) {
+    if (current()) {
+      updateViewerButtons(i);
+      setBadge(bmp ? 'Larger preview unavailable' : 'Preview unavailable', true);
+      onFileAccessError(err);
+    }
+  } finally {
+    if (current()) viewer.classList.remove('loading');
+    if (viewerDecodeAbort === controller) viewerDecodeAbort = null;
+  }
 }
 
 function updateViewerButtons(i) {
   if (!isValidIndex(i)) return;
   const d = dims[i] || null;
   viewerDims.textContent = fmtDims(d);
+  if (useVideoOverlay(i)) {
+    // Video has no preview/full-res decode concept.
+    viewerFull.style.display = "none";
+    setBadge("", false);
+    return;
+  }
   let needPreview = false;
   if (d) needPreview = computePreviewResize(i).downscaled;
   viewerFull.style.display = needPreview ? "inline-flex" : "none";
-  viewerFull.disabled = isFullRes;
-  if (needPreview) setBadge(isFullRes ? "Full-res" : "Preview", true);
+  viewerFull.disabled = isFullRes || fullResLimited;
+  if (needPreview) setBadge(isFullRes ? "Full resolution" : "Preview", true);
   else setBadge("", false);
 }
 
@@ -3406,7 +4160,7 @@ function updateViewerButtons(i) {
 function renderPromptPanel(i) {
   const list = prompts[i] || [];
   if (!list.length) {
-    promptTextEl.textContent = "No prompt found in metadata.";
+    promptTextEl.textContent = "No prompt found.";
     promptTextEl.classList.add("empty");
     pcount.textContent = ""; pPrev.disabled = true; pNext.disabled = true;
     viewerPrompt.classList.remove('on');
@@ -3436,25 +4190,30 @@ function syncPromptPanelHeight() {
 }
 window.addEventListener('resize', () => { if (showingPromptPanel) syncPromptPanelHeight(); });
 async function loadAndShowPrompts(i, autoShow) {
+  const generation = fileGeneration;
+  const entry = files[i];
+  const current = () => generation === fileGeneration && files[i] === entry && i === currentIndex;
   viewerPrompt.disabled = true;
-  viewerPrompt.textContent = "Loading…";
+  setActionIcon(viewerPrompt, 'prompt', 'Reading prompt…');
   try {
     const list = await ensurePrompts(i);
-    if (i !== currentIndex) return;
+    if (!current()) return;
     currentPromptIdx = 0;
     renderPromptPanel(i);
-    viewerPrompt.textContent = list.length ? (list.length > 1 ? `Prompts (${list.length})` : "Prompt") : "No prompt";
-    viewerPrompt.disabled = false;
+    setActionIcon(viewerPrompt, 'prompt', list.length ? `Show prompt${list.length > 1 ? 's ('+list.length+')' : ''} (P)` : 'No prompt found');
+    viewerPrompt.disabled = !list.length;
     if (autoShow && list.length) showPromptPanel(true);
     else viewerPrompt.classList.toggle('on', showingPromptPanel && list.length > 0);
     renderVisible();
-  } catch (_) { viewerPrompt.textContent = "Prompt"; viewerPrompt.disabled = false; }
+  } catch (_) { if (current()) { setActionIcon(viewerPrompt, 'prompt', 'Show prompt (P)'); viewerPrompt.disabled = false; } }
 }
 
 function updateFavButton() {
   if (!isValidIndex(currentIndex)) return;
   const on = favorites.has(files[currentIndex].path);
   viewerFav.textContent = on ? "★" : "☆";
+  viewerFav.setAttribute("aria-label", on ? "Remove from favorites (F)" : "Add to favorites (F)");
+  viewerFav.setAttribute("aria-pressed", String(on));
   viewerFav.classList.toggle('fav-on', on);
 }
 async function toggleFavForCurrent() {
@@ -3467,21 +4226,24 @@ async function toggleFavForCurrent() {
 }
 
 let slideshowTimer = 0;
-let slideshowIntervalMs = 3000;
+let slideshowIntervalMs = (() => { try { const saved = Number(localStorage.getItem('fast_gallery_slideshow_ms')); return saved >= 250 && saved <= 3600000 ? saved : 3000; } catch (_) { return 3000; } })();
 let shuffleMode = false;
 const SLIDESHOW_STEPS = [2000, 3000, 5000, 10000];
 function updateSlideshowBtn() {
   const on = slideshowTimer !== 0;
-  const s = Math.round(slideshowIntervalMs / 1000);
-  slideshowBtn.textContent = `${on ? '⏸' : '▶'} ${s}s`;
+  setActionIcon(slideshowBtn, on ? 'pause' : 'play', `${on ? 'Pause' : 'Start'} slideshow (S)`);
+  slideshowSeconds.value = String(slideshowIntervalMs / 1000);
+  slideshowBtn.setAttribute('aria-pressed', String(on));
   slideshowBtn.classList.toggle('on', on);
 }
 function updateShuffleBtn() {
   if (!shuffleBtn) return;
   shuffleBtn.classList.toggle('on', shuffleMode);
   shuffleBtn.title = shuffleMode
-    ? 'Shuffle ON — slideshow picks randomly (Shift+X)'
-    : 'Shuffle OFF — slideshow is sequential (Shift+X)';
+    ? 'Shuffle on — play in random order (Shift+X)'
+    : 'Shuffle off — play in sequence (Shift+X)';
+  shuffleBtn.setAttribute('aria-label', shuffleBtn.title);
+  shuffleBtn.setAttribute('aria-pressed', String(shuffleMode));
 }
 function toggleShuffle() { shuffleMode = !shuffleMode; updateShuffleBtn(); }
 function randomViewPos() {
@@ -3513,9 +4275,21 @@ function toggleSlideshow() { if (slideshowTimer) stopSlideshow(); else startSlid
 function cycleSlideshowInterval() {
   const cur = SLIDESHOW_STEPS.indexOf(slideshowIntervalMs);
   slideshowIntervalMs = SLIDESHOW_STEPS[(cur + 1) % SLIDESHOW_STEPS.length];
+  localStorage.setItem('fast_gallery_slideshow_ms', String(slideshowIntervalMs));
   if (slideshowTimer) startSlideshow();
   updateSlideshowBtn();
 }
+function setSlideshowSeconds(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds < 0.25 || seconds > 3600) return false;
+  slideshowIntervalMs = Math.round(seconds * 1000);
+  try { localStorage.setItem('fast_gallery_slideshow_ms', String(slideshowIntervalMs)); } catch (_) {}
+  if (slideshowTimer) { clearInterval(slideshowTimer); slideshowTimer = setInterval(slideshowTick, slideshowIntervalMs); }
+  return true;
+}
+slideshowSeconds.addEventListener('input', () => setSlideshowSeconds(slideshowSeconds.value));
+slideshowSeconds.addEventListener('change', () => { setSlideshowSeconds(slideshowSeconds.value); updateSlideshowBtn(); });
+slideshowSeconds.addEventListener('keydown', e => { if (e.key === 'Enter') { e.stopPropagation(); slideshowSeconds.blur(); } });
 function manualNext() { stopSlideshow(); nextInView(); }
 function manualPrev() { stopSlideshow(); prevInView(); }
 function openRandomImage() {
@@ -3541,6 +4315,8 @@ const FS_CELL_H = 80;
 const FS_OVERSCAN = 12;
 const filmstripUrls = new Map(); // globalIdx -> blob URL (kept while filmstrip open)
 const filmstripPending = new Map(); // globalIdx -> Promise<url>
+const FILMSTRIP_CACHE_MAX = 256;
+let filmstripAbort = new AbortController();
 let filmstripOn = false;
 let _userClosedFilmstrip = false;
 let fsTrackEl = null;
@@ -3548,32 +4324,54 @@ const fsMounted = new Map();   // viewPos -> DOM node
 const fsPool = [];             // recycled cells
 
 function revokeAllFilmstripUrls() {
+  filmstripAbort.abort();
+  filmstripAbort = new AbortController();
   for (const u of filmstripUrls.values()) {
     try { URL.revokeObjectURL(u); } catch (_) {}
   }
   filmstripUrls.clear();
   filmstripPending.clear();
 }
+function rememberFilmstripUrl(index, url) {
+  filmstripUrls.set(index, url);
+  while (filmstripUrls.size > FILMSTRIP_CACHE_MAX) {
+    const oldest = filmstripUrls.keys().next().value;
+    URL.revokeObjectURL(filmstripUrls.get(oldest));
+    filmstripUrls.delete(oldest);
+  }
+}
 function stepPx() { return FS_CELL_W + FS_CELL_GAP; }
 async function ensureFilmstripThumb(globalIdx) {
   if (filmstripUrls.has(globalIdx)) return filmstripUrls.get(globalIdx);
   const existing = filmstripPending.get(globalIdx);
   if (existing) return existing;
+  const entry = files[globalIdx];
+  const generation = fileGeneration;
+  const signal = filmstripAbort.signal;
+  const current = () => !signal.aborted && generation === fileGeneration && files[globalIdx] === entry;
   const p = (async () => {
-    const entry = files[globalIdx];
-    if (entry && entry.handle && entry.handle._rootId && typeof window.__fgThumbUrl === 'function') {
-      const url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 256);
-      if (url) { filmstripUrls.set(globalIdx, url); return url; }
+    if (!entry || !current()) return "";
+    let url = "";
+    // Video: capture a poster frame (Rust can't decode video). Own URL, kept in
+    // filmstripUrls and revoked by revokeAllFilmstripUrls — never shared with
+    // the grid's thumbUrlByIdx (independent revocation would double-free).
+    if (entry && isVideo(entry.name)) {
+      const res = await captureVideoPoster(entry, 256, signal);
+      url = res?.url || "";
+    } else if (entry.handle?._rootId && typeof window.__fgThumbUrl === 'function') {
+      url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 256, { signal });
+    } else {
+      try {
+        const f = await getFileForEntry(entry);
+        if (current()) url = URL.createObjectURL(f);
+      } catch (_) {}
     }
-    try {
-      const f = await getFileForEntry(files[globalIdx]);
-      const url = URL.createObjectURL(f);
-      filmstripUrls.set(globalIdx, url);
-      return url;
-    } catch (_) { return ""; }
+    if (!current()) { if (url) URL.revokeObjectURL(url); return ""; }
+    if (url) rememberFilmstripUrl(globalIdx, url);
+    return url;
   })();
   filmstripPending.set(globalIdx, p);
-  p.finally(() => filmstripPending.delete(globalIdx));
+  p.finally(() => { if (filmstripPending.get(globalIdx) === p) filmstripPending.delete(globalIdx); });
   return p;
 }
 
@@ -3597,21 +4395,26 @@ function loadFsCellImg(node, gi) {
   if (!img) return;
   if (img._forGI === gi && img.src) return;
   img._forGI = gi;
+  const generation = fileGeneration;
+  const request = node._fsRequest = {};
   img.removeAttribute('src');
   node.classList.remove('loaded','errored');
   const cached = filmstripUrls.get(gi);
   if (cached) { setSrc(img, cached, gi, node); return; }
   ensureFilmstripThumb(gi).then((u) => {
-    if (!filmstripOn) return;
+    if (!filmstripOn || generation !== fileGeneration || node._fsRequest !== request) return;
     if (img._forGI !== gi) return;
     if (!u) { node.classList.add('errored'); return; }
     setSrc(img, u, gi, node);
   });
 }
 function setSrc(img, url, gi, node) {
-  img.onerror = () => { if (img._forGI === gi) node.classList.add('errored'); };
+  const generation = fileGeneration;
+  const request = node._fsRequest;
+  const current = () => generation === fileGeneration && img._forGI === gi && node._fsRequest === request;
+  img.onerror = () => { if (current()) node.classList.add('errored'); };
   img.addEventListener('load', () => {
-    if (img._forGI === gi) node.classList.add('loaded');
+    if (current()) { node.classList.remove('errored'); node.classList.add('loaded'); }
   }, { once:true });
   img.src = url;
 }
@@ -3730,6 +4533,7 @@ function toggleFilmstrip(on, userAction) {
   if (userAction) _userClosedFilmstrip = !next;
   viewer.classList.toggle('showFilmstrip', filmstripOn);
   filmstripBtn.classList.toggle('on', filmstripOn);
+  filmstripBtn.setAttribute('aria-pressed', String(filmstripOn));
   if (filmstripOn) {
     renderFilmstrip();
     schedulePrefetchFilmstrip();
@@ -3747,36 +4551,58 @@ function toggleFilmstrip(on, userAction) {
 }
 
 async function openViewer(i, viewPos) {
+  stopHoverPreview();
   if (!hasViewerCanvas || !isValidIndex(i)) return;
   // Invalidate any in-flight decode from a previous open so its late result
   // can't paint the old bitmap over the new one.
-  activeReqId = ++decodeReqId;
+  cancelViewerDecode();
+  const openId = ++viewerOpenId;
+  const generation = fileGeneration;
+  const entry = files[i];
+  const wasOpen = viewer.classList.contains('open');
+  if (!wasOpen) { setGalleryControls(false); setViewerControls(false); }
+  const current = () => openId === viewerOpenId && generation === fileGeneration && files[i] === entry;
   if (typeof hidePromptTip === 'function') hidePromptTip();
   hideImgOverlay();
+  hideVideoOverlay();  // stop + clear any previous video before loading the next item
   closeBitmap(bmp); bmp = null; bmpW = 1; bmpH = 1;
+  drawViewer(); // Clear the retained canvas before any asynchronous file work.
+  viewer.classList.add('loading');
   currentIndex = i;
   currentViewPos = (typeof viewPos === 'number') ? viewPos : view.indexOf(i);
   if (currentViewPos < 0) currentViewPos = 0;
   viewerRotation = 0;
 
   try { await ensureDims(i); } catch (_) {}
+  if (!current()) return;
   const path = files[i].path || files[i].name;
   const total = view.length || files.length;
   viewerTitle.textContent = `${currentViewPos + 1} / ${total} — ${path}`;
   viewerDims.textContent = fmtDims(dims[i] || null);
   if (typeof fsPanelRefreshTitle === 'function') fsPanelRefreshTitle();
-  const wasOpen = viewer.classList.contains('open');
   viewer.classList.add('open');
   viewer.setAttribute('aria-hidden', 'false');
-  lockScroll();
-  // Filmstrip on by default: first open of a viewer session enables it. If the
-  // user explicitly toggled it off during the session, respect that.
-  if (!wasOpen && !filmstripOn && !_userClosedFilmstrip) toggleFilmstrip(true);
+  if (!wasOpen) lockScroll();
+  // The filmstrip is opt-in; opening an image never turns it on.
   requestAnimationFrame(() => drawViewer());
   isFullRes = false;
+  fullResLimited = false;
   updateViewerButtons(i);
   updateFavButton();
-  if (useImgOverlay(i)) {
+  if (useVideoOverlay(i)) {
+    // Video streams via the range-capable asset protocol on desktop (no bytes
+    // in JS); browser falls back to an object URL. No autoplay — hover plays.
+    const abs = files[i] && files[i].abs;
+    if (abs && typeof window.__fgAssetUrl === 'function') {
+      const url = window.__fgAssetUrl(abs);
+      if (i === currentIndex) showVideoOverlayUrl(url);
+    } else {
+      try {
+        const f = await getFileForEntry(files[i]);
+        if (current()) showVideoOverlay(f);
+      } catch (_) {}
+    }
+  } else if (useImgOverlay(i)) {
     // Prefer the asset protocol when we have an absolute path — no bytes in JS.
     const abs = files[i] && files[i].abs;
     if (abs && typeof window.__fgAssetUrl === 'function') {
@@ -3785,12 +4611,13 @@ async function openViewer(i, viewPos) {
     } else {
       try {
         const f = await getFileForEntry(files[i]);
-        if (i === currentIndex) showImgOverlay(f);
-      } catch (_) { startDecode(i, false); }
+        if (current()) showImgOverlay(f);
+      } catch (_) { if (current()) startDecode(i, false); }
     }
   } else {
     startDecode(i, false);
   }
+  if (!current()) return;
   currentPromptIdx = 0;
   const keepPanel = showingPromptPanel;
   loadAndShowPrompts(i, keepPanel);
@@ -3805,21 +4632,27 @@ async function openViewer(i, viewPos) {
   refreshStatus();
 }
 function closeViewer() {
+  ++viewerOpenId;
+  cancelViewerDecode();
+  setViewerControls(false);
+  setGalleryControls(false);
+  imageContextMenu.hidden = true;
   stopSlideshow();
   if (filmstripOn) toggleFilmstrip(false);
   // Fresh session next time — user's implicit off-during-session doesn't carry.
   _userClosedFilmstrip = false;
   setFullscreen(false);
   hideImgOverlay();
+  hideVideoOverlay();  // never let audio survive a close
   viewer.classList.remove('open','loading','showPrompt');
   viewer.setAttribute('aria-hidden', 'true');
-  activeReqId = ++decodeReqId;
   closeBitmap(bmp); bmp = null; bmpW = 1; bmpH = 1;
   setBadge("", false);
   unlockScroll();
   zoomS = 1; panX = 0; panY = 0; dragging = false;
   drawViewer();
   currentIndex = -1;
+  resumeBackgroundWork();
   showingPromptPanel = false;
   document.documentElement.style.setProperty('--promptH', '0px');
   // Grid was under a fixed overlay; some tiles may have skipped paint due to
@@ -3845,8 +4678,8 @@ viewerDel.addEventListener('click', () => {
   if (isValidIndex(currentIndex)) confirmAndDeleteIndexes([currentIndex]);
 });
 viewerFull.addEventListener('click', () => {
-  if (!isValidIndex(currentIndex) || isFullRes) return;
-  isFullRes = true; updateViewerButtons(currentIndex);
+  if (!isValidIndex(currentIndex) || isFullRes || fullResLimited) return;
+  viewerFull.disabled = true;
   startDecode(currentIndex, true);
 });
 viewerPrompt.addEventListener('click', () => {
@@ -3866,6 +4699,21 @@ slideshowBtn.addEventListener('click', (e) => {
 filmstripBtn.addEventListener('click', (e) => {
   e.preventDefault(); e.stopPropagation();
   toggleFilmstrip(undefined, true);
+});
+// Global mute toggle — persisted, applied to every video.
+viewerMute.addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  videoMuted = !videoMuted;
+  try { localStorage.setItem('fast_gallery_muted', videoMuted ? '1' : '0'); } catch (_) {}
+  applyMuteState();
+});
+applyMuteState(); // sync the glyph before the first video opens
+// Play on hover (no autoplay). Muted playback is always allowed; an unmuted
+// hover-play may be rejected by the browser policy — the controls stay usable.
+viewerVideoOverlay.addEventListener('pointerenter', () => {
+  if (viewer.classList.contains('open') && useVideoOverlay(currentIndex)) {
+    viewerVideoOverlay.play().catch(() => {});
+  }
 });
 viewerFilmstrip.addEventListener('click', (e) => {
   const cell = e.target.closest('.fcell');
@@ -3899,7 +4747,7 @@ fsStripNext.addEventListener('click', (e) => { e.preventDefault(); e.stopPropaga
 
 // Filmstrip prefetch: while open, spend idle time warming thumbs for cells
 // just outside the current viewport so scrolls reveal loaded images, not
-// shimmer. Bounded by the 8-slot shim queue so grid tiles still get served.
+// shimmer. Giant originals are only decoded when their cells are visible.
 let _fsPrefetchTimer = 0;
 function schedulePrefetchFilmstrip() {
   if (!filmstripOn) return;
@@ -3910,7 +4758,7 @@ function runFilmstripPrefetch() {
   _fsPrefetchTimer = 0;
   if (!filmstripOn || !view.length) return;
   const { from, to } = fsVisibleRange();
-  const radius = 40; // one screenful of cells at typical widths
+  const radius = 12;
   const lo = Math.max(0, from - radius);
   const hi = Math.min(view.length - 1, to + radius);
   const centerK = Math.max(from, Math.min(to, currentViewPos));
@@ -3919,13 +4767,17 @@ function runFilmstripPrefetch() {
     if (centerK - off >= lo) order.push(centerK - off);
     if (centerK + off <= hi && off !== 0) order.push(centerK + off);
   }
-  const CONCURRENT = 6;
+  const CONCURRENT = 2;
+  const generation = fileGeneration;
+  const signal = filmstripAbort.signal;
   let inflight = 0, i = 0;
   const step = () => {
+    if (signal.aborted || generation !== fileGeneration || !filmstripOn) return;
     while (inflight < CONCURRENT && i < order.length) {
       const k = order[i++];
       const gi = view[k];
       if (filmstripUrls.has(gi) || filmstripPending.has(gi)) continue;
+      if ((dims[gi]?.w || 0) * (dims[gi]?.h || 0) > PREVIEW_MAX_PIXELS || files[gi]?.size >= 32 * 1024 * 1024) continue;
       inflight++;
       ensureFilmstripThumb(gi).finally(() => {
         inflight--;
@@ -3942,76 +4794,91 @@ updateSlideshowBtn();
 updateShuffleBtn();
 viewerFav.addEventListener('click', toggleFavForCurrent);
 
-// Fullscreen mode: hide top bar, hide filmstrip, gather controls behind a
-// menu button. The top-bar and menu share the SAME button elements via DOM
-// re-parenting — no duplicated handlers, no state sync.
+// One set of controls serves both standard and fullscreen viewing.
 let fullscreenOn = false;
-let _origTopActions = null; // Element that owned the toolbar rows before we moved them
+let fullscreenRequested = false, fullscreenRequestId = 0;
+let fullscreenWork = Promise.resolve();
+viewer.appendChild(fsMenu);
+document.querySelectorAll('#viewer .topActions .vGroup').forEach((group, index) => {
+  group.dataset.label = ['Playback', 'Image', 'View'][index];
+  fsPanelRows.appendChild(group);
+});
 function fsPanelRefreshTitle() {
-  if (!fullscreenOn) return;
   if (!isValidIndex(currentIndex)) { fsPanelTitle.textContent = ''; return; }
-  const path = files[currentIndex].path || files[currentIndex].name;
-  const total = view.length || files.length;
-  fsPanelTitle.textContent = `${currentViewPos + 1} / ${total} — ${path}`;
+  fsPanelTitle.textContent = `${currentViewPos + 1} / ${view.length || files.length} — ${files[currentIndex].path || files[currentIndex].name}`;
 }
-function movePanelContents(toPanel) {
-  const topActions = document.querySelector('#viewer .top .topActions');
-  if (toPanel) {
-    if (_origTopActions) return; // already moved
-    _origTopActions = topActions;
-    // Move each vGroup (and any children) into fsPanelRows.
-    const rows = topActions.querySelectorAll('.vGroup');
-    fsPanelRows.innerHTML = '';
-    rows.forEach(g => fsPanelRows.appendChild(g));
-  } else {
-    if (!_origTopActions) return;
-    const rows = fsPanelRows.querySelectorAll('.vGroup');
-    rows.forEach(g => _origTopActions.appendChild(g));
-    _origTopActions = null;
-    fsPanelRows.innerHTML = '';
-  }
+function setViewerControls(open, restoreFocus = false) {
+  fsPanel.hidden = !open;
+  fsPanel.classList.toggle('open', open);
+  fsMenuBtn.setAttribute('aria-expanded', String(open));
+  if (open) fsPanel.querySelector('button:not([disabled])')?.focus();
+  else if (restoreFocus) fsMenuBtn.focus();
 }
-function setFullscreen(on) {
-  const next = !!on;
-  if (next === fullscreenOn) return;
-  fullscreenOn = next;
+function applyFullscreenState(on) {
+  fullscreenOn = !!on;
   viewer.classList.toggle('fullscreen', fullscreenOn);
-  if (fullscreenOn) {
-    // Save + apply: turn filmstrip off (no user-flag flip so re-open restores),
-    // move controls into the collapsible panel, refresh title.
-    movePanelContents(true);
-    fsPanelRefreshTitle();
-    // Update button label
-    viewerFullscreen.textContent = '⛶';
-  } else {
-    fsPanel.classList.remove('open');
-    movePanelContents(false);
-    viewerFullscreen.textContent = '⛶';
-  }
-  // Recompute base scale — stage inset changes.
+  setActionIcon(viewerFullscreen, fullscreenOn ? 'exitFull' : 'fullscreen', fullscreenOn ? 'Exit fullscreen (Z / Esc)' : 'Fullscreen (Z)');
+  viewerFullscreen.setAttribute('aria-pressed', String(fullscreenOn));
+  setViewerControls(false);
   if (viewer.classList.contains('open')) {
     baseScale = computeBaseScale();
     drawViewer();
   }
 }
+function setFullscreen(on) {
+  const desired = !!on;
+  fullscreenRequested = desired;
+  const request = ++fullscreenRequestId;
+  fullscreenWork = fullscreenWork.catch(() => {}).then(async () => {
+    if (request !== fullscreenRequestId) return;
+    try {
+      const win = window.__FG_NATIVE__ && window.__TAURI__?.window?.getCurrentWindow();
+      if (win) {
+        if (await win.isFullscreen() !== desired) await win.setFullscreen(desired);
+        applyFullscreenState(await win.isFullscreen());
+      } else {
+        if (desired && !document.fullscreenElement) await document.documentElement.requestFullscreen();
+        else if (!desired && document.fullscreenElement) await document.exitFullscreen();
+        applyFullscreenState(!!document.fullscreenElement);
+      }
+    } catch (_) {
+      if (request === fullscreenRequestId) fullscreenRequested = fullscreenOn;
+      showActionNotice('Fullscreen could not be changed.');
+    }
+  });
+  return fullscreenWork;
+}
+document.addEventListener('fullscreenchange', () => {
+  if (!window.__FG_NATIVE__) { fullscreenRequested = !!document.fullscreenElement; applyFullscreenState(fullscreenRequested); }
+});
 viewerFullscreen.addEventListener('click', (e) => {
-  e.preventDefault(); e.stopPropagation();
-  setFullscreen(!fullscreenOn);
+  e.preventDefault(); e.stopPropagation(); setFullscreen(!fullscreenRequested);
+  fsMenuBtn.focus();
 });
 fsMenuBtn.addEventListener('click', (e) => {
   e.preventDefault(); e.stopPropagation();
-  fsPanel.classList.toggle('open');
+  setViewerControls(!fsPanel.classList.contains('open'));
 });
-// Stop stage from taking pointerdown while interacting with the menu.
-fsMenu.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
-fsMenu.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: true });
-// Click outside panel closes it. Use capture to run before the stage's
-// pointerdown/click handlers that stop propagation.
-viewer.addEventListener('pointerdown', (e) => {
-  if (!fullscreenOn) return;
-  if (!fsPanel.classList.contains('open')) return;
-  if (fsPanel.contains(e.target) || fsMenuBtn.contains(e.target)) return;
-  fsPanel.classList.remove('open');
+document.getElementById('viewerControlsClose').addEventListener('click', () => setViewerControls(false, true));
+const actionIconButtons = {
+  viewerPrev:'prev',viewerNext:'next',viewerRandom:'shuffle',shuffleBtn:'shuffle',filmstripBtn:'film',viewerMute:'muted',
+  viewerPrompt:'prompt',viewerCopy:'image',viewerPath:'path',viewerFolder:'folder',viewerDl:'download',viewerFull:'fullres',
+  viewerDel:'trash',viewerFullscreen:'fullscreen',viewerHelp:'help',viewerZoomOut:'zoomOut',viewerFit:'fit',viewerZoomIn:'zoomIn',viewerRotate:'rotate',
+  randomOpenBtn:'shuffle',favOnly:'star',helpBtn:'help',dlAllBtn:'download',delAllBtn:'trash',galleryControlsClose:'close',viewerControlsClose:'close',
+};
+for (const [id, icon] of Object.entries(actionIconButtons)) setActionIcon(document.getElementById(id), icon);
+setActionIcon(document.getElementById('galleryControlsClose'), 'close', 'Close controls');
+viewerFav.classList.add('iconAction');
+function resetViewerZoom() { zoomS = 1; panX = 0; panY = 0; drawViewer(); }
+document.getElementById('viewerFit').addEventListener('click', resetViewerZoom);
+for (const [id, factor] of [['viewerZoomIn',1.25],['viewerZoomOut',0.8]]) document.getElementById(id).addEventListener('click', () => {
+  const r = stageRect(); zoomAt(r.left+r.w/2, r.top+r.h/2, factor);
+});
+document.getElementById('viewerRotate').addEventListener('click', () => { viewerRotation = (viewerRotation+90)%360; baseScale = computeBaseScale(); drawViewer(); });
+fsMenu.addEventListener('pointerdown', e => e.stopPropagation());
+fsMenu.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+viewer.addEventListener('pointerdown', e => {
+  if (!fsMenu.contains(e.target)) setViewerControls(false);
 }, true);
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; }
@@ -4025,15 +4892,58 @@ async function copyText(text) {
     return ok;
   }
 }
-viewerCopy.addEventListener('click', async () => {
+async function clipboardImageBlob(i) {
+  const entry = files[i], generation = fileGeneration;
+  const d = await ensureDims(i);
+  if (!d || d._unknown || d.w*d.h > 64000000 || Math.max(d.w,d.h) > 16384) throw new Error('Image too large or dimensions unavailable');
+  if (generation !== fileGeneration || files[i] !== entry) throw new Error('Image changed');
+  const file = await getFileForEntry(entry);
+  const image = await createImageBitmap(file, {imageOrientation:'from-image'});
+  try {
+    if (image.width*image.height > 64000000 || Math.max(image.width,image.height)>16384) throw new Error('Image too large');
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width; canvas.height = image.height;
+    canvas.getContext('2d').drawImage(image,0,0);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/png'));
+    if (!blob) throw new Error('Image encoding failed');
+    return blob;
+  } finally { image.close(); }
+}
+async function copyCurrentImage() {
+  if (!isValidIndex(currentIndex) || useVideoOverlay(currentIndex)) return;
+  if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+    showActionNotice('Image copying is unavailable here. Use Download original instead.'); return;
+  }
+  try {
+    // Start the write during the user gesture; encode the source at its own
+    // dimensions, independently of the viewer's zoom, pan and black background.
+    await navigator.clipboard.write([new ClipboardItem({'image/png':clipboardImageBlob(currentIndex)})]);
+    showActionNotice('Image copied');
+  } catch (_) { showActionNotice('Could not copy this image. It may be too large or clipboard access was denied. Use Download original instead.'); }
+}
+viewerCopy.addEventListener('click', copyCurrentImage);
+viewerPath.addEventListener('click', async () => {
   if (!isValidIndex(currentIndex)) return;
   const e = files[currentIndex];
   const p = e.abs || e.path;
-  const orig = viewerCopy.textContent;
-  await copyText(p);
-  viewerCopy.textContent = "Copied";
-  setTimeout(() => { viewerCopy.textContent = orig; }, 900);
+  showActionNotice(await copyText(p) ? 'Image path copied' : 'Could not copy the image path');
 });
+const imageContextMenu = document.createElement('div');
+imageContextMenu.className = 'imageContext'; imageContextMenu.hidden = true; imageContextMenu.setAttribute('role','menu');
+for (const [label, action] of [['Copy image',copyCurrentImage],['Copy image path',()=>viewerPath.click()],['Download original',()=>viewerDl.click()]]) {
+  const button = document.createElement('button'); button.className = 'btn ghost'; button.type='button'; button.textContent=label; button.setAttribute('role','menuitem');
+  button.addEventListener('click',()=>{ imageContextMenu.hidden=true; action(); });imageContextMenu.appendChild(button);
+}
+viewer.appendChild(imageContextMenu);
+viewerStage.addEventListener('contextmenu',e=>{
+  if (useVideoOverlay(currentIndex) || e.target.closest('button,input,select')) return;
+  e.preventDefault(); imageContextMenu.hidden=false;
+  imageContextMenu.style.left=Math.min(e.clientX,window.innerWidth-210)+'px';
+  imageContextMenu.style.top=Math.min(e.clientY,window.innerHeight-140)+'px';
+  imageContextMenu.querySelector('button').focus();
+});
+document.addEventListener('pointerdown',e=>{if(!imageContextMenu.contains(e.target))imageContextMenu.hidden=true;},true);
+imageContextMenu.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();imageContextMenu.hidden=true;fsMenuBtn.focus();}});
 
 const folderToast = document.getElementById('folderToast');
 const folderToastPath = document.getElementById('folderToastPath');
@@ -4061,10 +4971,7 @@ async function revealFolderForIndex(i) {
 }
 viewerFolder.addEventListener('click', async () => {
   if (!isValidIndex(currentIndex)) return;
-  const orig = viewerFolder.textContent;
   await revealFolderForIndex(currentIndex);
-  viewerFolder.textContent = "Copied";
-  setTimeout(() => { viewerFolder.textContent = orig; }, 900);
 });
 
 pClose.addEventListener('click', () => showPromptPanel(false));
@@ -4099,20 +5006,7 @@ pCopy.addEventListener('click', async () => {
 
 window.addEventListener('keydown', (e) => {
   // Modal + banner Y/N shortcuts take precedence over everything else.
-  if (confirmModal.classList.contains('open')) {
-    if (e.key === 'y' || e.key === 'Y' || e.key === 'Enter') {
-      e.preventDefault(); e.stopPropagation();
-      confirmOk.click();
-      return;
-    }
-    if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') {
-      e.preventDefault(); e.stopPropagation();
-      closeConfirmModal();
-      return;
-    }
-    // Swallow other keys so grid/viewer shortcuts don't fire beneath the modal.
-    if (e.key.length === 1 || e.key === 'Delete' || e.key === 'Tab') return;
-  }
+  if (handleConfirmKeydown(e)) return;
   // Reopen / permission banners: Y confirms, N dismisses. Only fire when the
   // key target isn't a text input (so typing in filters keeps working).
   const tgt = e.target;
@@ -4127,6 +5021,7 @@ window.addEventListener('keydown', (e) => {
       if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') { e.preventDefault(); permDismiss.click(); return; }
     }
   }
+  if (inputActive && e.key !== 'Escape') return;
   if (e.key === '?') {
     if (!e.ctrlKey && !e.metaKey) {
       shortcutsEl.style.display = shortcutsEl.style.display === 'block' ? 'none' : 'block';
@@ -4188,21 +5083,31 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (slideshowTimer) { stopSlideshow(); return; }
     if (shortcutsEl.style.display === 'block') { shortcutsEl.style.display = 'none'; return; }
-    if (fsPanel && fsPanel.classList.contains('open')) { fsPanel.classList.remove('open'); return; }
+    if (fsPanel && fsPanel.classList.contains('open')) { setViewerControls(false, true); return; }
     if (fullscreenOn) { setFullscreen(false); return; }
     if (showingPromptPanel) { showPromptPanel(false); return; }
     closeViewer(); return;
   }
-  if (e.key === 'z' || e.key === 'Z') { setFullscreen(!fullscreenOn); e.preventDefault(); return; }
+  if (e.key === 'z' || e.key === 'Z') { setFullscreen(!fullscreenRequested); e.preventDefault(); return; }
   if (e.key === 'p' || e.key === 'P') { viewerPrompt.click(); return; }
   if (e.key === 'f' || e.key === 'F') { toggleFavForCurrent(); return; }
-  if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
+  if ((e.key === 'c' || e.key === 'C') && !window.getSelection()?.toString()) {
+    e.preventDefault();
     if (e.shiftKey) { viewerFolder.click(); }
+    else if (e.altKey) { viewerPath.click(); }
     else { viewerCopy.click(); }
     return;
   }
   if (e.key === 's' || e.key === 'S') { toggleSlideshow(); e.preventDefault(); return; }
   if (e.key === 't' || e.key === 'T') { toggleFilmstrip(undefined, true); e.preventDefault(); return; }
+  if (e.key === 'm' || e.key === 'M') { viewerMute.click(); e.preventDefault(); return; }
+  // Zoom/rotate keys don't apply to video (canvas-only). Swallow them so they
+  // can't disturb the <video> or steal focus.
+  if (useVideoOverlay(currentIndex) &&
+      (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_' ||
+       e.key === '0' || e.key === '1' || e.key === 'r' || e.key === 'R')) {
+    e.preventDefault(); return;
+  }
   if (e.key === '+' || e.key === '=') {
     const r = stageRect();
     zoomAt(r.left + r.w / 2, r.top + r.h / 2, 1.25);
@@ -4599,11 +5504,11 @@ function doResetFilters() {
   filterState.colors.clear(); renderColorStrip();
   filterState.favoritesOnly = false; favOnlyBtn.classList.remove('on');
   filterState.currentPath = ""; renderFolderStrip();
-  filterState.recursive = true; syncRecSwitch();
+  filterState.recursive = false; syncRecSwitch();
   saveFilterState(); applyFilters();
 }
 function revertResetLabel() {
-  resetFiltersBtn.textContent = "Reset";
+  resetFiltersBtn.textContent = "Reset filters";
   resetFiltersBtn.classList.remove('armed');
   resetArmedUntil = 0;
   clearTimeout(resetRevertT);
@@ -4617,7 +5522,7 @@ resetFiltersBtn.addEventListener('click', () => {
     return;
   }
   resetArmedUntil = now + 3000;
-  resetFiltersBtn.textContent = "Sure?";
+  resetFiltersBtn.textContent = "Confirm reset";
   resetFiltersBtn.classList.add('armed');
   clearTimeout(resetRevertT);
   resetRevertT = setTimeout(revertResetLabel, 3000);
@@ -4730,7 +5635,7 @@ function renderFolderStrip() {
   const rootCrumb = document.createElement('button');
   rootCrumb.type = 'button';
   rootCrumb.className = 'crumb' + (currentPath === "" ? ' current' : '');
-  rootCrumb.textContent = '▸ root';
+  rootCrumb.textContent = '▸ Root folder';
   rootCrumb.title = 'Root';
   rootCrumb.addEventListener('click', () => navigateFolder(""));
   folderCrumbsEl.appendChild(rootCrumb);
@@ -4867,6 +5772,8 @@ function updatePrefetchUI() {
 async function startPrefetchPrompts() {
   if (prefetchAbort) prefetchAbort.aborted = true;
   const token = { aborted:false };
+  const generation = fileGeneration;
+  const signal = fileWorkAbort.signal;
   prefetchAbort = token;
   prefetchDone = 0;
   updatePrefetchUI();
@@ -4876,8 +5783,10 @@ async function startPrefetchPrompts() {
   const workers = new Array(Math.min(CONC, total)).fill(0).map(async () => {
     while (idx < total) {
       const cur = idx++;
-      if (token.aborted) return;
+      await waitForBackground(signal);
+      if (token.aborted || signal.aborted || generation !== fileGeneration) return;
       if (!prompts[cur]) { try { await ensurePrompts(cur); } catch (_) {} }
+      if (token.aborted || signal.aborted || generation !== fileGeneration) return;
       prefetchDone++;
       if ((prefetchDone & 15) === 0 || prefetchDone === total) updatePrefetchUI();
     }
@@ -4886,7 +5795,7 @@ async function startPrefetchPrompts() {
   if (!token.aborted) {
     updatePrefetchUI();
     // Prompt filter depends on prompts[] presence; re-apply once scan is done.
-    if (filterState.promptFilter !== 'all') applyFilters();
+    if (filterState.promptFilter !== 'all' || filterState.keyword) applyFilters();
     else renderVisible();
   }
 }
@@ -4898,8 +5807,11 @@ async function estimatePrefetchSize() {
   const picks = [];
   for (let i = 0; i < n && picks.length < sampleN; i += step) picks.push(i);
   let totalSampled = 0, counted = 0;
+  const generation = fileGeneration;
   for (const i of picks) {
+    if (generation !== fileGeneration) return null;
     try {
+      if (Number.isFinite(files[i]?.size)) { totalSampled += files[i].size; counted++; continue; }
       const f = await getFileForEntry(files[i]);
       if (f && Number.isFinite(f.size)) { totalSampled += f.size; counted++; }
     } catch (_) {}
@@ -4916,7 +5828,7 @@ function flipPf() {
   if (prefetchActive && files.length) {
     if (files.length > 1000) {
       pfEstEl.style.display = "block";
-      pfEstEl.textContent = "estimating...";
+      pfEstEl.textContent = "Estimating…";
       estimatePrefetchSize().then((est) => {
         if (!prefetchActive || !est) { pfEstEl.style.display = "none"; return; }
         pfEstEl.textContent = `~${est.files} files · ~${est.estMB} MB`;
@@ -4950,26 +5862,42 @@ function updatePrefetchColorsUI() {
 async function startPrefetchColors() {
   if (prefetchColorsAbort) prefetchColorsAbort.aborted = true;
   const token = { aborted:false };
+  const generation = fileGeneration;
+  const signal = fileWorkAbort.signal;
   prefetchColorsAbort = token;
   prefetchColorsDone = 0;
   updatePrefetchColorsUI();
-  const CONC = 4;
+  const CONC = 2;
   let idx = 0;
   const total = files.length;
   const workers = new Array(Math.min(CONC, total)).fill(0).map(async () => {
     while (idx < total) {
       const cur = idx++;
-      if (token.aborted) return;
-      if (!colors[cur]) {
+      await waitForBackground(signal);
+      if (token.aborted || signal.aborted || generation !== fileGeneration) return;
+      if (!colors[cur] && !isVideoIndex(cur)) {  // videos have no decodable color signature
         try {
-          const f = await getFileForEntry(files[cur]);
-          const bmp = await createImageBitmap(f, { resizeWidth:32, resizeHeight:32, resizeQuality:"low" });
+          const entry = files[cur];
+          let url = "";
+          let source;
+          let bitmap;
           try {
-            const sig = computeColorSignature(bmp);
-            if (sig) colors[cur] = sig;
-          } finally { try { bmp.close(); } catch (_) {} }
+            if (entry.handle?._rootId && typeof window.__fgThumbUrl === 'function') {
+              url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 64, { signal });
+              if (!url) throw new Error('Thumbnail unavailable');
+              source = await (await fetch(url)).blob();
+            } else source = await getFileForEntry(entry);
+            if (token.aborted || signal.aborted || generation !== fileGeneration) return;
+            bitmap = await createImageBitmap(source, { resizeWidth:32, resizeHeight:32, resizeQuality:"low" });
+            const sig = computeColorSignature(bitmap);
+            if (sig && !token.aborted && generation === fileGeneration && files[cur] === entry) colors[cur] = sig;
+          } finally {
+            closeBitmap(bitmap);
+            if (url) URL.revokeObjectURL(url);
+          }
         } catch (_) {}
       }
+      if (token.aborted || signal.aborted || generation !== fileGeneration) return;
       prefetchColorsDone++;
       if ((prefetchColorsDone & 15) === 0 || prefetchColorsDone === total) updatePrefetchColorsUI();
     }
@@ -4994,6 +5922,9 @@ permRegrant.addEventListener('click', async () => {
 permDismiss.addEventListener('click', () => { permBanner.style.display = "none"; });
 walkToastClose.addEventListener('click', () => { walkToast.style.display = "none"; });
 quotaToastClose.addEventListener('click', () => { quotaToast.style.display = "none"; });
+legacyFavoritesImport.addEventListener('click', () => { finishLegacyFavorites(true).catch(() => showQuotaToast()); });
+legacyFavoritesDismiss.addEventListener('click', () => { finishLegacyFavorites(false).catch(() => showQuotaToast()); });
+deleteToastClose.addEventListener('click', () => { deleteToast.style.display = "none"; });
 
 // =====================================================================
 // ZIP
@@ -5105,7 +6036,7 @@ async function downloadSelectedZip() {
   if (!indices.length) return;
   dlAllBtn.disabled = true;
   const old = dlAllBtn.textContent;
-  dlAllBtn.textContent = "Zipping...";
+  dlAllBtn.textContent = "Creating ZIP…";
   try {
     if ('showSaveFilePicker' in window) {
       try {
@@ -5216,11 +6147,28 @@ function refreshStatus() {
 // =====================================================================
 // Load pipeline
 // =====================================================================
-async function resetAndLoadFiles(entries, key) {
+function invalidateFileWork() {
+  ++fileGeneration;
+  fileWorkAbort.abort();
+  fileWorkAbort = new AbortController();
+  ++viewerOpenId;
+  cancelViewerDecode();
   if (prefetchAbort) { prefetchAbort.aborted = true; prefetchAbort = null; }
   if (prefetchColorsAbort) { prefetchColorsAbort.aborted = true; prefetchColorsAbort = null; }
-  sidecarCache.clear();
+  clearTimeout(dimensionLayoutTimer);
+  dimensionLayoutTimer = 0;
+  for (const node of mounted.values()) resetTileNode(node);
+  for (const node of fsMounted.values()) resetFsCell(node);
+  revokeAllFilmstripUrls();
   forgetAllThumbUrls();
+}
+async function resetAndLoadFiles(entries, key, preserveViewer = false, legacyAliases = []) {
+  if (!preserveViewer && viewer.classList.contains('open')) closeViewer();
+  invalidateFileWork();
+  const generation = fileGeneration;
+  legacyFavoriteOffer = null;
+  legacyFavoritesBanner.style.display = 'none';
+  sidecarCache.clear();
   files = entries;
   dims = new Array(files.length);
   dimsP = new Array(files.length);
@@ -5230,7 +6178,9 @@ async function resetAndLoadFiles(entries, key) {
   selected.clear();
   lastSelectedK = -1;
   rootKey = key || "";
-  favorites = await loadFavoritesFor(rootKey);
+  const loadedFavorites = await loadFavoritesFor(rootKey);
+  if (generation !== fileGeneration) return false;
+  favorites = loadedFavorites;
 
   empty.style.display = files.length ? "none" : "block";
   document.body.classList.toggle('nofiles', !files.length);
@@ -5251,7 +6201,6 @@ async function resetAndLoadFiles(entries, key) {
     // hide everything on a new root.
     view = buildView();
     if (view.length === 0) {
-      if (!filterState.recursive) { filterState.recursive = true; syncRecSwitch(); relaxed = true; }
       if (filterState.currentPath) { filterState.currentPath = ""; relaxed = true; }
       if (filterState.favoritesOnly) { filterState.favoritesOnly = false; favOnlyBtn.classList.remove('on'); relaxed = true; }
       if (relaxed) { saveFilterState(); renderFolderStrip(); }
@@ -5263,10 +6212,11 @@ async function resetAndLoadFiles(entries, key) {
   applyFilters();
   loaderHide();
   refreshStatus();
+  offerLegacyFavorites(rootKey, legacyAliases, generation).catch(() => showQuotaToast());
 
   // Auto-open BEFORE any dim scan, so double-click-image → viewer opens in
   // ~one file read instead of waiting for the whole folder to be measured.
-  maybeAutoOpenFromBoot();
+  await maybeAutoOpenFromBoot();
 
   if (files.length) {
     // Prioritize the file we just auto-opened, then the first-viewport batch,
@@ -5276,9 +6226,10 @@ async function resetAndLoadFiles(entries, key) {
 
   if (prefetchActive && files.length) startPrefetchPrompts();
   if (prefetchColorsActive && files.length) startPrefetchColors();
+  return true;
 }
 
-function maybeAutoOpenFromBoot() {
+async function maybeAutoOpenFromBoot() {
   if (!_pendingOpenName || !files.length) return;
   const target = _pendingOpenName;
   _pendingOpenName = "";
@@ -5294,55 +6245,63 @@ function maybeAutoOpenFromBoot() {
   if (fileIdx < 0) return;
   const vpos = view.indexOf(fileIdx);
   if (vpos < 0) return;
-  requestAnimationFrame(() => openViewer(view[vpos], vpos));
+  await openViewer(view[vpos], vpos);
 }
 
-async function ensureFirstDims(n, onProgress) {
-  // Legacy sync version — kept for callers that need to await. New paths use
-  // ensureFirstDimsInBackground instead.
-  const upto = Math.min(n, files.length);
-  const idxs = [];
-  for (let i = 0; i < upto; i++) idxs.push(i);
-  let done = 0;
-  await mapLimit(idxs, 16, async (i) => {
-    await ensureDims(i);
-    done++;
-    if (onProgress && (done === upto || (done & 15) === 0)) onProgress(done, upto);
-  });
-  ensureRestDimsInBackground(upto);
+let dimensionLayoutTimer = 0;
+function scheduleDimensionLayout(generation, immediate = false) {
+  if (generation !== fileGeneration) return;
+  if (immediate) {
+    clearTimeout(dimensionLayoutTimer); dimensionLayoutTimer = 0;
+    applyFilters();
+  } else if (!dimensionLayoutTimer) {
+    dimensionLayoutTimer = setTimeout(() => {
+      dimensionLayoutTimer = 0;
+      if (generation === fileGeneration) applyFilters();
+    }, 250);
+  }
+}
+async function scanDimensions(from, to, concurrency, generation, signal) {
+  let index = from;
+  await Promise.all(Array.from({ length:Math.min(concurrency, to - from) }, async () => {
+    while (index < to) {
+      await waitForBackground(signal);
+      if (signal.aborted || generation !== fileGeneration) return;
+      const i = index++;
+      await ensureDims(i);
+      if (signal.aborted || generation !== fileGeneration) return;
+      dimsDone++;
+      if ((dimsDone & 15) === 0) { scheduleDimensionLayout(generation); refreshStatus(); }
+      if ((dimsDone & 31) === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  }));
 }
 function ensureFirstDimsInBackground(n) {
   const upto = Math.min(n, files.length);
-  const idxs = [];
-  for (let i = 0; i < upto; i++) idxs.push(i);
+  const generation = fileGeneration;
+  const signal = fileWorkAbort.signal;
   dimsActive = true; dimsDone = 0; dimsTotal = files.length;
   refreshStatus();
-  mapLimit(idxs, 4, async (i) => {
-    await ensureDims(i);
-    dimsDone++;
-    // Re-layout every ~16 arrivals so tile aspect ratios settle progressively.
-    if ((dimsDone & 15) === 0 || dimsDone === upto) { onScrollOrResize(); refreshStatus(); }
+  scanDimensions(0, upto, 3, generation, signal).then(() => {
+    if (signal.aborted || generation !== fileGeneration) return;
+    scheduleDimensionLayout(generation, true);
+    ensureRestDimsInBackground(upto, generation, signal);
   }).then(() => {
-    onScrollOrResize();
-    ensureRestDimsInBackground(upto);
+    if (generation === fileGeneration) refreshStatus();
   });
 }
-async function ensureRestDimsInBackground(startFrom) {
-  const idxs = [];
-  for (let i = startFrom; i < files.length; i++) idxs.push(i);
-  if (!idxs.length) { dimsActive = false; refreshStatus(); return; }
-  mapLimit(idxs, 3, async (i) => {
-    await ensureDims(i);
-    dimsDone++;
-    if ((i & 63) === 0) { onScrollOrResize(); refreshStatus(); }
-  }).then(() => {
-    dimsActive = false;
-    refreshStatus();
-    applyFilters();
-  });
+async function ensureRestDimsInBackground(startFrom, generation = fileGeneration, signal = fileWorkAbort.signal) {
+  await scanDimensions(startFrom, files.length, 2, generation, signal);
+  if (signal.aborted || generation !== fileGeneration) return;
+  dimsActive = false;
+  refreshStatus();
+  scheduleDimensionLayout(generation, true);
 }
 
 async function loadViaFSA(dirHandle) {
+  folderLoadAbort?.abort();
+  const load = folderLoadAbort = new AbortController();
+  folderLoadingRoot = dirHandle;
   // If a watcher was running for a previous root, stop it before we swap.
   if (currentRootHandle && currentRootHandle._rootId
       && (!dirHandle || dirHandle._rootId !== currentRootHandle._rootId)
@@ -5362,14 +6321,19 @@ async function loadViaFSA(dirHandle) {
       for (const e of batch) collected.push(e);
       const n = collected.length;
       if (n - lastScanUpd >= 100 || n === 0) { lastScanUpd = n; loaderScanning(n); }
-    }, undefined, stats);
+    }, load.signal, stats);
+    if (load.signal.aborted) return;
     loaderScanning(collected.length);
     loaderShow("Sorting");
     collected.sort((a,b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
-    await resetAndLoadFiles(collected, "fsa:" + (dirHandle.name || "root"));
+    const key = await favoritesKeyForHandle(dirHandle);
+    if (load.signal.aborted) return;
+    if (!await resetAndLoadFiles(collected, key, false, legacyFavoriteKeysFor(dirHandle))) return;
   } finally {
-    loaderHide();
+    if (folderLoadingRoot === dirHandle) folderLoadingRoot = null;
+    if (!load.signal.aborted) loaderHide();
   }
+  if (load.signal.aborted) return;
   if (stats.walkErrors > 0) {
     walkToastText.textContent = `Skipped ${stats.walkErrors} folder${stats.walkErrors === 1 ? "" : "s"} (permission or read error)`;
     walkToast.style.display = "flex";
@@ -5391,8 +6355,10 @@ let _fgRefreshInFlight = false;
 let _fgRefreshQueued = false;
 async function refreshFilesFromRoot() {
   if (!currentRootHandle) return;
-  if (_fgRefreshInFlight) { _fgRefreshQueued = true; return; }
+  if (_fgRefreshInFlight || deleteInProgress) { _fgRefreshQueued = true; return; }
   _fgRefreshInFlight = true;
+  const root = currentRootHandle;
+  const generation = fileGeneration;
   try {
     // Snapshot state we want to preserve across the reset.
     const prevSelectedPaths = new Set();
@@ -5426,15 +6392,18 @@ async function refreshFilesFromRoot() {
     const collected = [];
     const stats = { walkErrors: 0 };
     try {
-      await walkDirectoryFSA(currentRootHandle, (batch) => {
+      await walkDirectoryFSA(root, (batch) => {
         for (const e of batch) collected.push(e);
       }, undefined, stats);
     } catch (_) {}
+    if (root !== currentRootHandle) return;
+    if (generation !== fileGeneration) { _fgRefreshQueued = true; return; }
+    if (deleteInProgress) { _fgRefreshQueued = true; return; }
     collected.sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
 
     // resetAndLoadFiles wipes selection + caches; capture the ones we want back.
-    const rootKeyPrev = "fsa:" + ((currentRootHandle && currentRootHandle.name) || "root");
-    await resetAndLoadFiles(collected, rootKeyPrev);
+    const rootKeyPrev = rootKey;
+    if (!await resetAndLoadFiles(collected, rootKeyPrev, true, legacyFavoriteKeysFor(root))) return;
 
     // Restore per-file caches by matching path.
     for (let i = 0; i < files.length; i++) {
@@ -5443,6 +6412,7 @@ async function refreshFilesFromRoot() {
       if (prevPrompts.has(p)) prompts[i] = prevPrompts.get(p);
       if (prevColors.has(p))  colors[i]  = prevColors.get(p);
     }
+    applyFilters();
 
     // Restore selection.
     if (prevSelectedPaths.size) {
@@ -5489,7 +6459,7 @@ async function refreshFilesFromRoot() {
     if (filmstripOn) renderFilmstripVisible();
   } finally {
     _fgRefreshInFlight = false;
-    if (_fgRefreshQueued) {
+    if (_fgRefreshQueued && !deleteInProgress) {
       _fgRefreshQueued = false;
       setTimeout(refreshFilesFromRoot, 0);
     }
@@ -5510,6 +6480,7 @@ window.addEventListener('fg-fs-change', (e) => {
 });
 
 async function loadViaWebkitDirectory(fileList) {
+  folderLoadAbort?.abort();
   resetSidecars();
   loaderScanning(0);
   try {
@@ -5546,8 +6517,8 @@ async function loadViaWebkitDirectory(fileList) {
         folderLc: slash < 0 ? "" : pLc.slice(0, slash),
       };
     });
-    const rootName = entries.length ? (entries[0].path.split("/")[0] || "") : "";
-    await resetAndLoadFiles(entries, "webkit:" + rootName);
+    // File-list imports do not expose a durable folder identity.
+    await resetAndLoadFiles(entries, "");
   } finally {
     loaderHide();
   }
@@ -5573,9 +6544,11 @@ pickBtn.addEventListener('click', pickFolder);
 
 // Desktop boot: file-association / second-instance dispatches fg-boot-open.
 // Payload = { file, root }. root is an absolute folder path; file is a basename.
+let externalOpenId = 0;
 async function handleFgBootOpen(payload) {
   if (!payload || !payload.root) return;
   if (typeof window.__fgOpenPathAsRoot !== 'function') return; // browser build
+  const request = ++externalOpenId;
   try {
     // If the same root is already open, skip re-scan and just re-target the viewer.
     // Match on absolute path when available (name alone can collide across drives).
@@ -5584,24 +6557,28 @@ async function handleFgBootOpen(payload) {
     const wantName = payload.root.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
     const rootAbs = norm(currentRootHandle && currentRootHandle.absPath);
     const nameMatches = currentRootHandle && (currentRootHandle.name || '') === wantName;
-    const rootStillOpen = files.length && (rootAbs ? rootAbs === wantPath : nameMatches);
+    const rootStillOpen = !folderLoadingRoot && files.length && (rootAbs ? rootAbs === wantPath : nameMatches);
     _pendingOpenName = payload.file || '';
     if (rootStillOpen) {
       // Force any currently-open viewer to close first so the new file decode
       // isn't racing against stale bitmap/overlay state from the previous open.
       if (viewer.classList.contains('open')) closeViewer();
-      maybeAutoOpenFromBoot();
+      await maybeAutoOpenFromBoot();
       return;
     }
     reopenBanner.style.display = 'none';
     if (viewer.classList.contains('open')) closeViewer();
     const handle = await window.__fgOpenPathAsRoot(payload.root);
+    if (request !== externalOpenId) return;
     if (!handle) { _pendingOpenName = ''; return; }
     // Native handles are not structured-cloneable; skip IDB persistence.
     await loadViaFSA(handle);
-  } catch (err) {
-    console.error('fg-boot-open failed:', err);
+  } catch (_) {
     _pendingOpenName = '';
+  } finally {
+    if (request === externalOpenId) {
+      try { await window.__fgPresent?.(); } catch (_) {}
+    }
   }
 }
 window.addEventListener('fg-boot-open', (e) => { handleFgBootOpen(e.detail); });
@@ -5625,6 +6602,7 @@ if (window.__FG_NATIVE__) {
       try {
         const max = await appWin.isMaximized();
         document.body.classList.toggle('maximized', !!max);
+        applyFullscreenState(await appWin.isFullscreen());
       } catch (_) {}
     };
     syncMaxState();
@@ -5737,6 +6715,7 @@ window.addEventListener('drop', async (e) => {
   e.preventDefault();
   dragDepth = 0;
   document.body.classList.remove('dropping');
+  folderLoadAbort?.abort();
   try {
     const items = e.dataTransfer?.items;
     if (!items || !items.length) return;
@@ -5817,10 +6796,11 @@ window.addEventListener('drop', async (e) => {
     collected.sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
 
     const total = fsaHandles.length + legacyEntries.length + plainFiles.length;
-    const rootName = total === 1 ? (rootLabel || "drop") : `${total} items`;
     reopenBanner.style.display = "none";
-    currentRootHandle = (fsaHandles.length === 1 && fsaHandles[0].kind === 'directory') ? fsaHandles[0] : null;
-    await resetAndLoadFiles(collected, "drop:" + rootName);
+    currentRootHandle = (total === 1 && fsaHandles[0]?.kind === 'directory') ? fsaHandles[0] : null;
+    const root = currentRootHandle;
+    const key = root ? await favoritesKeyForHandle(root) : '';
+    await resetAndLoadFiles(collected, key, false, root ? legacyFavoriteKeysFor(root) : []);
   } catch (err) {
     console.error("drop handler failed:", err);
   } finally {
@@ -5857,12 +6837,7 @@ updateShuffleBtn();
 refreshStatus();
 requestAnimationFrame(() => { syncBarHeight(); drawViewer(); });
 
-window.addEventListener('beforeunload', () => {
-  if (decodeWorker && decodeWorker._url) {
-    try { decodeWorker.terminate(); } catch (_) {}
-    try { URL.revokeObjectURL(decodeWorker._url); } catch (_) {}
-  }
-});
+window.addEventListener('beforeunload', cancelViewerDecode);
 })();
 </script>
 

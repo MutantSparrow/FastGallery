@@ -1,0 +1,56 @@
+{
+  "product": "Fast Gallery",
+  "version": "1.6.1",
+  "target": "x86_64-pc-windows-msvc",
+  "configuration": "release",
+  "builtAtUtc": "2026-10-29T21:31:06.056Z",
+  "artifact": "desktop/release/fast-gallery-v1.6.1-usability.exe",
+  "bytes": 11726336,
+  "sha256": "46f80b84179187e6fc0a9d32b2661dfceafe36d5f32ff53428be7164883e84a1",
+  "checks": {
+    "x64GuiPE": true,
+    "sourceUnchanged": true,
+    "privateMetadataDetected": false,
+    "pdbNames": [
+      "fast-gallery.pdb"
+    ]
+  },
+  "implementationMarkers": {
+    "previewCommand": true,
+    "orientedThumbnailCache": true,
+    "unusedNativeWriteCommandAbsent": true
+  },
+  "sources": {
+    "fast-gallery.html": "7354e7c5d749ea756856057338e836e49a6643382498ab0ff7db792d7649010d",
+    "desktop/src/build.mjs": "88dc5672e0505121ccf7a3d8a0f6aa3b217d3e1d16896310b1bfd6d4ce295f17",
+    "desktop/src/shim.js": "e03d833b2cbdabf1cd1624f13aea04be51a283274d42992cf59ae2bcf7de2ba6",
+    "desktop/package.json": "72f30fd76f3b4068ef83d14bf33c8dc9b8e403a084dc3e26943c9e9c6c33bfa2",
+    "desktop/src-tauri/Cargo.toml": "aa58e03af033a6a8e032310117c8adfab683f432ca42a7b239550aa5007cd5a7",
+    "desktop/src-tauri/Cargo.lock": "d313c7c10fe5fbd9462eb26acf3b04a1726764298279ac53b0c1d1605fdc5822",
+    "desktop/src-tauri/build.rs": "4ae2333b11623039cc115e29b696e7ff5cdfcd5b7d628280ddf48fa733e6418d",
+    "desktop/src-tauri/tauri.conf.json": "413a736f882c072839c13e5ed2cefb27240a76cf0cdc5ff6e69945fc49b81a39",
+    "desktop/src-tauri/capabilities/default.json": "90235aee2565a601d597637a56e97652189d9068eb6a3774f31214ca9ee8c8dc",
+    "desktop/src-tauri/icons/icon.ico": "8e98f2ffdc4edb60f55e620fe40fca02ad98edb02f211c867491f647e2e85b6e",
+    "desktop/src-tauri/src/main.rs": "f28faf37894d2530f84785b64821ffa60e8aefb116f68a05ff2e0d5f048c47a2",
+    "desktop/src-tauri/src/assoc.rs": "5f5c4578f4890ae4e3646acd11f43daaebf274b393e71f50ea41e30e8a9b71f5",
+    "desktop/src-tauri/src/lib.rs": "b659225248246f8d4341c1baef8d7f5c73645eb614aae36ad7a32bc9e701eacb",
+    "desktop/src-tauri/src/fs_commands.rs": "02ec8e164f80744c00c335be3f38ec45ecaf9ff6499f7fdb96177b914f399825"
+  },
+  "sourceHashNotes": "sources hashes the exact working-tree bytes used by the build. gitSources hashes the equivalent Git blobs after line-ending normalization.",
+  "gitSources": {
+    "fast-gallery.html": "d3770d647fe0793819181c3377d3576eae820ed83051c234baca0395a88e2d32",
+    "desktop/src/build.mjs": "8e44888c8367bca1678d18d98d32de190db0527f46e8c847b5a1f9c2042854b6",
+    "desktop/src/shim.js": "f965465652c6d974392a94f2ca85a25c9797980176405921ad889f3f76d3cdee",
+    "desktop/package.json": "009f37434e38592c5df5309f20d0e01402d6290fd8abf344fc94af37ba6a6823",
+    "desktop/src-tauri/Cargo.toml": "aa58e03af033a6a8e032310117c8adfab683f432ca42a7b239550aa5007cd5a7",
+    "desktop/src-tauri/Cargo.lock": "5a59476cdd9ef10b13fc9c9a33722e4cb4c9cf0bbf1dfe83c67356831ac8d766",
+    "desktop/src-tauri/build.rs": "487059eaf8a947b80f20a9aacac038a5047b2ad69d2401b827376c67d6fe847f",
+    "desktop/src-tauri/tauri.conf.json": "e0748cffeecc7b88d61b51175a1ee1e036f0fe78eb938448b708b72d03ef4d35",
+    "desktop/src-tauri/capabilities/default.json": "221e07214bb5bd0ba3a33b1eb55841684ce60e8870f6c848cf9be67642549b8e",
+    "desktop/src-tauri/icons/icon.ico": "8e98f2ffdc4edb60f55e620fe40fca02ad98edb02f211c867491f647e2e85b6e",
+    "desktop/src-tauri/src/main.rs": "9527685e16227c3b85d3a94c0eb5ae9c686c29cc3c10172c54b36e7e8dcb45ec",
+    "desktop/src-tauri/src/assoc.rs": "2828ab6783a9bee207acbcb7fa30bc0c7ec69f4d9b034c4e6b5ffa78fcc8d1b3",
+    "desktop/src-tauri/src/lib.rs": "e3a77424ce808ca24d3df82d06bc38e54d230aa61989d1b84994a90354ff2aa2",
+    "desktop/src-tauri/src/fs_commands.rs": "fc732c08b08f124124b52a0cd1ebe4324593f24be32f59cadbe5f17ea7122f4c"
+  }
+}

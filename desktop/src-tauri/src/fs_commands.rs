@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use std::time::{Duration, UNIX_EPOCH};
 
 use image::imageops::FilterType;
-use image::{ImageEncoder, ImageReader};
+use image::{DynamicImage, ImageDecoder, ImageEncoder, ImageFormat, ImageReader};
 use notify::{RecursiveMode, Watcher};
 use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, FileIdMap};
 use serde::Serialize;
@@ -268,30 +268,6 @@ pub fn fs_delete(
 }
 
 #[command]
-pub fn fs_write_bytes(
-    state: State<'_, FsState>,
-    root_id: String,
-    rel: String,
-    bytes: Vec<u8>,
-) -> Result<(), String> {
-    let root = root_for(&state, &root_id)?;
-    // parent must exist inside the root
-    let (parent_rel, _fname) = match rel.rsplit_once('/') {
-        Some((a, b)) => (a.to_string(), b.to_string()),
-        None => (String::new(), rel.clone()),
-    };
-    let parent = resolve_child(&root, &parent_rel)?;
-    let target = parent.join(&_fname);
-    // ensure target is inside the root even if not yet existing
-    if let Ok(canon_parent) = fs::canonicalize(&parent) {
-        if !canon_parent.starts_with(&root) {
-            return Err("path escapes root".into());
-        }
-    }
-    fs::write(&target, &bytes).map_err(|e| e.to_string())
-}
-
-#[command]
 pub fn fs_reveal(
     state: State<'_, FsState>,
     root_id: String,
@@ -327,6 +303,7 @@ fn thumb_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
 
 fn thumb_key(abs: &str, mtime_ms: i64, max: u32) -> String {
     let mut h = Sha1::new();
+    h.update(b"oriented-thumbs-v1");
     h.update(abs.as_bytes());
     h.update(mtime_ms.to_le_bytes());
     h.update(max.to_le_bytes());
@@ -336,25 +313,48 @@ fn thumb_key(abs: &str, mtime_ms: i64, max: u32) -> String {
     s
 }
 
-fn render_thumb(src: &Path, max: u32) -> Result<Vec<u8>, String> {
-    // Large-image safety: raise the image crate's default guard (default ~64Mp)
-    // to something that covers the 12k x 26k monsters people actually produce
-    // with tiled samplers. We only decode once here, then downscale hard.
+// A small output thumbnail can still require a gigabyte-sized source decode.
+// Share this gate between thumbnails and viewer previews, including IPC callers
+// outside the shim's priority queue. Hold it until source pixels are released.
+static IMAGE_DECODE_LOCK: Mutex<()> = Mutex::new(());
+
+fn preview_dimensions(w: u32, h: u32, max_edge: u32, max_pixels: u64) -> (u32, u32) {
+    let scale = (max_edge as f64 / w.max(h).max(1) as f64)
+        .min((max_pixels as f64 / (w as f64 * h as f64).max(1.0)).sqrt())
+        .min(1.0);
+    ((w as f64 * scale).floor().max(1.0) as u32,
+     (h as f64 * scale).floor().max(1.0) as u32)
+}
+
+fn decode_scaled(src: &Path, max_edge: u32, max_pixels: u64) -> Result<DynamicImage, String> {
     let mut reader = ImageReader::open(src).map_err(|e| e.to_string())?
         .with_guessed_format().map_err(|e| e.to_string())?;
     let mut limits = image::Limits::default();
-    // Allow up to 4 GiB per allocation and 32k px on each side. Some upscaled
-    // tiled samplers produce 12k×26k PNGs (~1.2 GB uncompressed RGBA).
-    limits.max_alloc = Some(4u64 * 1024 * 1024 * 1024);
+    // Still accommodates 12k x 26k RGBA artwork, but reject allocations beyond
+    // 2 GiB rather than running several unrestricted decoders simultaneously.
+    limits.max_alloc = Some(2u64 * 1024 * 1024 * 1024);
     limits.max_image_width = Some(32768);
     limits.max_image_height = Some(32768);
     reader.limits(limits);
 
-    let img = reader.decode().map_err(|e| format!("decode: {e}"))?;
-    let (w, h) = (img.width(), img.height());
-    let scaled = if w.max(h) <= max { img } else {
-        img.resize(max, max, FilterType::Triangle)
+    let mut decoder = reader.into_decoder().map_err(|e| format!("decode: {e}"))?;
+    let orientation = decoder.orientation().unwrap_or(image::metadata::Orientation::NoTransforms);
+    let img = DynamicImage::from_decoder(decoder).map_err(|e| format!("decode: {e}"))?;
+    let (w, h) = preview_dimensions(img.width(), img.height(), max_edge, max_pixels);
+    let mut scaled = if (w, h) == (img.width(), img.height()) { img } else {
+        let scaled = img.resize_exact(w, h, FilterType::Triangle);
+        drop(img);
+        scaled
     };
+    // Rotate the small result, so EXIF orientations that require a copy never
+    // duplicate the giant source bitmap.
+    scaled.apply_orientation(orientation);
+    Ok(scaled)
+}
+
+fn render_thumb(src: &Path, max: u32) -> Result<Vec<u8>, String> {
+    let _decode = IMAGE_DECODE_LOCK.lock().map_err(|_| "image decoder unavailable")?;
+    let scaled = decode_scaled(src, max, u64::from(max) * u64::from(max))?;
     let mut buf: Vec<u8> = Vec::with_capacity(64 * 1024);
     let mut cur = Cursor::new(&mut buf);
     let rgb = scaled.to_rgb8();
@@ -362,6 +362,14 @@ fn render_thumb(src: &Path, max: u32) -> Result<Vec<u8>, String> {
     encoder.write_image(&rgb, rgb.width(), rgb.height(), image::ExtendedColorType::Rgb8)
         .map_err(|e| e.to_string())?;
     Ok(buf)
+}
+
+fn render_preview(src: &Path, max_edge: u32, max_pixels: u64) -> Result<Vec<u8>, String> {
+    let _decode = IMAGE_DECODE_LOCK.lock().map_err(|_| "image decoder unavailable")?;
+    let scaled = decode_scaled(src, max_edge, max_pixels)?;
+    let mut bytes = Cursor::new(Vec::new());
+    scaled.write_to(&mut bytes, ImageFormat::Png).map_err(|e| e.to_string())?;
+    Ok(bytes.into_inner())
 }
 
 /// Read only the first `max_bytes` of a file. Used by the JS side to scan
@@ -406,7 +414,10 @@ pub async fn fs_dims(
     tauri::async_runtime::spawn_blocking(move || {
         let reader = ImageReader::open(&p).map_err(|e| e.to_string())?
             .with_guessed_format().map_err(|e| e.to_string())?;
-        reader.into_dimensions().map_err(|e| e.to_string())
+        let mut decoder = reader.into_decoder().map_err(|e| e.to_string())?;
+        let (w, h) = decoder.dimensions();
+        let orientation = decoder.orientation().unwrap_or(image::metadata::Orientation::NoTransforms);
+        Ok(if orientation.to_exif() >= 5 { (h, w) } else { (w, h) })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -447,6 +458,26 @@ pub async fn fs_thumb(
     // best-effort cache write
     let _ = fs::write(&cached, &bytes);
     Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// Lossless, size-bounded viewer preview. Original file bytes and full-size
+/// source pixels stay in Rust; only the resized PNG crosses into the webview.
+#[command]
+pub async fn fs_preview(
+    state: State<'_, FsState>,
+    root_id: String,
+    rel: String,
+    max_edge: u32,
+    max_pixels: u64,
+) -> Result<tauri::ipc::Response, String> {
+    let root = root_for(&state, &root_id)?;
+    let p = resolve_child(&root, &rel)?;
+    let edge = max_edge.clamp(64, 16384);
+    let pixels = max_pixels.clamp(4096, 96_000_000);
+    tauri::async_runtime::spawn_blocking(move || render_preview(&p, edge, pixels))
+    .await
+    .map_err(|e| e.to_string())?
+    .map(tauri::ipc::Response::new)
 }
 
 // ------------- fg-image:// custom protocol -------------
@@ -506,6 +537,8 @@ fn guess_mime(path: &str) -> &'static str {
     if lower.ends_with(".gif") { return "image/gif"; }
     if lower.ends_with(".avif") { return "image/avif"; }
     if lower.ends_with(".bmp") { return "image/bmp"; }
+    if lower.ends_with(".mp4") { return "video/mp4"; }
+    if lower.ends_with(".webm") { return "video/webm"; }
     if lower.ends_with(".html") || lower.ends_with(".htm") { return "text/html; charset=utf-8"; }
     "application/octet-stream"
 }
@@ -569,4 +602,55 @@ pub async fn fs_watch_start(
 pub fn fs_watch_stop(state: State<'_, FsState>, root_id: String) -> Result<(), String> {
     state.watchers.lock().unwrap().remove(&root_id);
     Ok(())
+}
+
+#[cfg(test)]
+mod performance_tests {
+    use super::*;
+
+    #[test]
+    fn giant_preview_dimensions_obey_both_limits() {
+        for (w, h) in [(12000, 26000), (32768, 1000), (20000, 20000), (400, 800)] {
+            let (pw, ph) = preview_dimensions(w, h, 8192, 16_000_000);
+            assert!(pw <= w && ph <= h);
+            assert!(pw.max(ph) <= 8192);
+            assert!(u64::from(pw) * u64::from(ph) <= 16_000_000);
+            assert!((pw as f64 / ph as f64 - w as f64 / h as f64).abs() < 0.02);
+        }
+    }
+
+    #[test]
+    fn small_images_are_not_upscaled() {
+        assert_eq!(preview_dimensions(40, 80, 8192, 16_000_000), (40, 80));
+    }
+
+    #[test]
+    fn bounded_native_decode_retains_transparency() {
+        let file = std::env::temp_dir().join(format!("gallery-synthetic-{}.png", uuid::Uuid::new_v4()));
+        let fixture = image::RgbaImage::from_pixel(600, 300, image::Rgba([10, 20, 30, 0]));
+        fixture.save(&file).expect("write synthetic fixture");
+        let result = render_preview(&file, 100, 8000);
+        let _ = fs::remove_file(&file);
+        let preview = image::load_from_memory(&result.expect("decode synthetic fixture"))
+            .expect("decode preview PNG");
+        assert_eq!((preview.width(), preview.height()), (100, 50));
+        assert_eq!(preview.to_rgba8().get_pixel(0, 0)[3], 0);
+    }
+
+    #[test]
+    #[ignore = "manual large-image smoke test"]
+    fn large_preview_smoke() {
+        let file = std::env::temp_dir().join(format!("gallery-synthetic-{}.png", uuid::Uuid::new_v4()));
+        let fixture = image::RgbaImage::from_pixel(8192, 4096, image::Rgba([30, 60, 90, 128]));
+        fixture.save(&file).expect("write synthetic large fixture");
+        drop(fixture);
+        let start = std::time::Instant::now();
+        let result = render_preview(&file, 2048, 4_000_000);
+        let elapsed = start.elapsed();
+        let _ = fs::remove_file(&file);
+        let bytes = result.expect("decode large fixture");
+        let preview = image::load_from_memory(&bytes).expect("decode preview PNG");
+        assert_eq!((preview.width(), preview.height()), (2048, 1024));
+        println!("Synthetic 8192x4096 -> 2048x1024 preview: {} ms, {} encoded bytes", elapsed.as_millis(), bytes.len());
+    }
 }
