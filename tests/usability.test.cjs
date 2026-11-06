@@ -53,7 +53,7 @@ test('external file open clears old viewer and prepares the new target before pr
 test('viewer clears the retained bitmap before waiting for dimensions',async()=>{
   const events=[];let finish;
   const c=vm.createContext({files:[{}],hasViewerCanvas:true,isValidIndex:()=>true,stopHoverPreview(){},cancelViewerDecode(){},viewerOpenId:0,fileGeneration:1,
-    viewer:{classList:{contains:()=>true,add(){}}},hideImgOverlay(){},hideVideoOverlay(){},bmp:{old:true},bmpW:600,bmpH:900,
+    viewer:{classList:{contains:()=>true,add(){}}},hideImgOverlay(){},hideVideoOverlay(){},hidePdfOverlay(){},bmp:{old:true},bmpW:600,bmpH:900,
     closeBitmap:()=>events.push('close'),drawViewer:()=>events.push('clear'),currentIndex:0,currentViewPos:0,viewerRotation:0,
     ensureDims:()=>{events.push('wait');return new Promise(r=>{finish=r;});}});
   vm.runInContext(source('async function openViewer(','function closeViewer()'),c);const opening=c.openViewer(0,0);

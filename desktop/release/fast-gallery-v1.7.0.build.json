@@ -1,0 +1,64 @@
+{
+  "product": "Fast Gallery",
+  "version": "1.7.0",
+  "target": "x86_64-pc-windows-msvc",
+  "configuration": "release",
+  "builtAtUtc": "2026-11-06T20:08:02.000Z",
+  "artifact": "desktop/release/fast-gallery-v1.7.0.exe",
+  "bytes": 12042752,
+  "sha256": "ca5013a95e41be3df07353c8f149916a1f6698c97839f47bc6a473b428f57fd6",
+  "checks": {
+    "x64GuiPE": true,
+    "fileVersion": "1.7.0",
+    "productVersion": "1.7.0",
+    "sourceUnchanged": true,
+    "privateMetadataDetected": false,
+    "pathPrefixesRemapped": true,
+    "pdbNames": [
+      "fast_gallery.pdb"
+    ]
+  },
+  "implementationMarkers": {
+    "pdfExtensionAccepted": true,
+    "windowsDataPdfThumbnails": true,
+    "pdfOpenWithAssociation": true,
+    "trayVersionLabel": true
+  },
+  "sources": {
+    "fast-gallery.html": "b7fbd7a9af5f62b3f6300b1dfff30738dd154a355a09e89f8d709a368f6ec3e7",
+    "desktop/src/build.mjs": "88dc5672e0505121ccf7a3d8a0f6aa3b217d3e1d16896310b1bfd6d4ce295f17",
+    "desktop/src/shim.js": "809c3cd4779e39e380499c093cc2f5719f4d4112c5dcdb3e4b5edfb117edf02e",
+    "desktop/package.json": "b7a30d330123b709bc204d9081e5fa21030342befc3249acfcd928411d79c331",
+    "desktop/package-lock.json": "770c478c343c255edac907368881d7ffe7b7dc0fc9cd3b390bf92eb72e9f4679",
+    "desktop/src-tauri/Cargo.toml": "7bde2ee617707b45b0763732dd4d158ce8aa3c825c2c220e82d732453507d7f7",
+    "desktop/src-tauri/Cargo.lock": "42a631f1bb5e2442fdfb213d72968d55c206e9456e2901cb86ea9ca048f0d57b",
+    "desktop/src-tauri/build.rs": "4ae2333b11623039cc115e29b696e7ff5cdfcd5b7d628280ddf48fa733e6418d",
+    "desktop/src-tauri/tauri.conf.json": "3b78b8bf34a2159b2379412133d5e5e6e0edaea474a96c31a94f8ae035b47c71",
+    "desktop/src-tauri/capabilities/default.json": "90235aee2565a601d597637a56e97652189d9068eb6a3774f31214ca9ee8c8dc",
+    "desktop/src-tauri/icons/icon.ico": "8e98f2ffdc4edb60f55e620fe40fca02ad98edb02f211c867491f647e2e85b6e",
+    "desktop/src-tauri/src/main.rs": "f28faf37894d2530f84785b64821ffa60e8aefb116f68a05ff2e0d5f048c47a2",
+    "desktop/src-tauri/src/assoc.rs": "dc1dfe012602d786e502afed847d1412088815a18f70314d20ecd683997b48ed",
+    "desktop/src-tauri/src/lib.rs": "a9fec95fdbbe112361adeea7745d7ac31aa5b39086fddadad28bff238232fdb5",
+    "desktop/src-tauri/src/fs_commands.rs": "484a9afc2cec0d89133a30097d2319bb40cef7e9499b1f727f500f55a3e200d1",
+    "desktop/src-tauri/src/pdf.rs": "a6097bb8a04235bb4532ca3409eda80970a179a2017c5462060424fd13c5a90e"
+  },
+  "verification": {
+    "javascriptTestsPassed": 80,
+    "nativeUnitTestsPassed": 11,
+    "trayTooltipAtRuntime": "Fast Gallery v1.7.0",
+    "edgeBrowser": {
+      "synthetic": true,
+      "cardTile": true,
+      "builtInViewer": true,
+      "frameReleasedOnNavigate": true,
+      "historyUnchanged": true
+    },
+    "webview2Desktop": {
+      "synthetic": true,
+      "launchArgumentOpensPdf": true,
+      "assetProtocolViewer": true,
+      "nativeFirstPageThumbnail": true,
+      "frameReleasedOnClose": true
+    }
+  }
+}

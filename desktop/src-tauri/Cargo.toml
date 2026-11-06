@@ -1,6 +1,6 @@
 [package]
 name = "fast-gallery"
-version = "1.6.1"
+version = "1.7.0"
 description = "Fast Gallery — desktop wrapper"
 authors = ["Fast Gallery"]
 edition = "2021"
@@ -30,6 +30,9 @@ notify-debouncer-full = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
+# Windows.Data.Pdf renders PDF thumbnails with the OS's built-in engine.
+# Same version Tauri already resolves, so no additional crate download.
+windows = { version = "0.61", features = ["Data_Pdf", "Foundation", "Storage", "Storage_Streams", "Win32_System_WinRT"] }
 
 [features]
 default = ["custom-protocol"]

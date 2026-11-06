@@ -580,6 +580,33 @@
   .tile.previewing .hoverVideo{opacity:1}
   .tile.previewing .vplay{display:none}
 
+  /* PDF tiles: format chip (PDFs never carry prompts, so the prompt chip's
+     slot is free) and, when no page render exists, a document card. */
+  .pdfchip{
+    position:absolute; left:8px; top:24px;
+    padding:1px 5px;
+    font:600 9px/1 var(--font-mono); letter-spacing:.10em;
+    color:var(--fg); background:rgba(10,10,10,.75);
+    border:1px solid var(--rule-strong);
+    display:none; user-select:none; pointer-events:none;
+  }
+  .tile[data-pdf="1"] .pdfchip{ display:block; }
+  .pname{
+    position:absolute; left:10px; right:10px; top:62%;
+    font:12px/1.35 var(--font-ui); color:var(--muted);
+    text-align:center; word-break:break-word;
+    user-select:none; pointer-events:none;
+    overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
+    visibility:hidden;
+  }
+  .tile[data-pdfcard="1"] .pname{ visibility:visible; }
+  /* Icon in the upper band, caption below it, for any tile aspect ratio. */
+  .tile[data-pdfcard="1"] .thumb{
+    position:absolute; left:0; top:14%; height:44%;
+    object-fit:contain; background:transparent;
+  }
+  .tile[data-pdfcard="1"]{ background:#050505; }
+
 
   /* Star (favorites) — square, mono, unified with tile actions */
   .star{
@@ -947,6 +974,15 @@
     display:none;
     background:#000;
     z-index:2;              /* above canvas; controls stay clickable */
+  }
+  /* PDFs open in the browser's / WebView2's built-in PDF viewer. The frame
+     is created per document and removed on close (see showPdfOverlay). */
+  #viewer #viewerPdfOverlay{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    border:0; display:block;
+    background:#1c1c1c;
+    z-index:2;
   }
   #viewer .filmstripWrap{
     position:absolute; left:0; right:0; bottom:0;
@@ -1701,12 +1737,27 @@ let prefetchAbort = null;
 
 const GAP = 12;
 // Master gate for what shows in the gallery. Despite the name it also covers
-// video now (mp4/webm) — kept as-is because the walk / isImage / drop handler
-// all rely on it. Use VIDEO_EXT_RE below to branch on video specifically.
-const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|avif|bmp|mp4|webm)$/i;
+// video (mp4/webm) and PDF — kept as-is because the walk / isImage / drop
+// handler all rely on it. Use VIDEO_EXT_RE / PDF_EXT_RE to branch on those.
+const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|avif|bmp|mp4|webm|pdf)$/i;
 const VIDEO_EXT_RE = /\.(mp4|webm)$/i;
+const PDF_EXT_RE = /\.pdf$/i;
 const isVideo = (name) => VIDEO_EXT_RE.test(name || "");
+const isPdf = (name) => PDF_EXT_RE.test(name || "");
 function isVideoIndex(i){ const f = files[i]; return !!f && VIDEO_EXT_RE.test(f.name || ("." + (f.ext || ""))); }
+function isPdfIndex(i){ const f = files[i]; return !!f && PDF_EXT_RE.test(f.name || ("." + (f.ext || ""))); }
+// Browser builds have no PDF rasterizer, so PDF tiles show this document card.
+// A data URL: shared by every tile, never revoked, nothing to clean up.
+const PDF_CARD_URL = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+  '<path d="M24 6h38l20 20v68H24z" fill="#1c1c1c" stroke="#8a857b" stroke-width="2.5" stroke-linejoin="round"/>' +
+  '<path d="M62 6v20h20" fill="none" stroke="#8a857b" stroke-width="2.5" stroke-linejoin="round"/>' +
+  '<rect x="30" y="52" width="40" height="18" fill="#d97b2a"/>' +
+  '<text x="50" y="65.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="13" fill="#0a0a0a">PDF</text>' +
+  '</svg>');
+function nativeThumbsFor(entry) {
+  return !!(entry && entry.handle && entry.handle._rootId && typeof window.__fgThumbUrl === 'function');
+}
 
 const PREVIEW_MAX_PIXELS = 16_000_000;
 const PREVIEW_MAX_DIM = 8192;
@@ -2167,11 +2218,45 @@ async function getGenericDimsViaBitmap(file) {
   try { b.close(); } catch (_) {}
   return d;
 }
+// First-page size in points. Browsers cannot rasterize PDFs, so read the first
+// /MediaBox from the head of the file. Pages kept in compressed object streams
+// have no plain-text box; they use the A4 portrait default.
+const PDF_HEAD_SCAN = 1024 * 1024;
+const PDF_DEFAULT_DIMS = { w:595, h:842 };
+function parsePdfMediaBox(text) {
+  const n = '(-?\\d+(?:\\.\\d+)?|-?\\.\\d+)';
+  const m = new RegExp(`/MediaBox\\s*\\[\\s*${n}\\s+${n}\\s+${n}\\s+${n}\\s*\\]`).exec(text);
+  if (!m) return null;
+  const w = Math.round(Math.abs(Number(m[3]) - Number(m[1])));
+  const h = Math.round(Math.abs(Number(m[4]) - Number(m[2])));
+  if (!(w > 0 && h > 0 && w <= 200000 && h <= 200000)) return null;
+  // Only trust /Rotate when it sits in the same dictionary as the box.
+  const dictStart = text.lastIndexOf('<<', m.index);
+  const dictEnd = text.indexOf('>>', m.index);
+  const dict = text.slice(dictStart < 0 ? m.index : dictStart, dictEnd < 0 ? undefined : dictEnd);
+  const rot = /\/Rotate\s+(-?\d+)/.exec(dict);
+  const quarter = rot && Math.abs(Number(rot[1])) % 180 === 90;
+  return quarter ? { w:h, h:w } : { w, h };
+}
+async function getPdfDims(file) {
+  const buf = await file.slice(0, PDF_HEAD_SCAN).arrayBuffer();
+  const text = new TextDecoder('latin1').decode(buf);
+  // Readers accept leading junk before the header within the first 1 KB.
+  const header = text.indexOf('%PDF-');
+  if (header < 0 || header > 1024) throw new Error('not a pdf');
+  return parsePdfMediaBox(text) || { ...PDF_DEFAULT_DIMS };
+}
 async function getDims(file) {
   const name = (file.name || "").toLowerCase();
   if (name.endsWith(".png")) return await getPngDims(file);
   if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return await getJpegDims(file);
+  if (name.endsWith(".pdf")) return await getPdfDims(file);
   return await getGenericDimsViaBitmap(file);
+}
+// Tiles and the viewer label PDF sizes as points, not pixels.
+function fmtDimsFor(i) {
+  const s = fmtDims(dims[i] || null);
+  return (s !== "—" && isPdfIndex(i)) ? s + " pt" : s;
 }
 // Video dimensions from a metadata-only load. No pixel read → no crossOrigin
 // (setting it would make a non-CORS asset URL fail to load outright).
@@ -2693,6 +2778,11 @@ function ensurePrompts(i) {
   const generation = fileGeneration;
   promptsP[i] = (async () => {
     let list = [];
+    // PDFs carry no generation metadata; skip reading them entirely.
+    if (entry && isPdf(entry.name)) {
+      if (generation === fileGeneration && files[i] === entry) prompts[i] = list;
+      return list;
+    }
     try {
       // Desktop fast path: request just the file head. PNG/JPEG metadata for
       // prompts lives near the start; 2 MB is enough for realistic images.
@@ -3114,8 +3204,10 @@ function makeTileNode() {
   del.type = 'button'; del.className = 'del'; del.title = 'Delete';
   del.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const vplay = document.createElement('div'); vplay.className = 'vplay'; vplay.textContent = '▶';
-  tile.appendChild(img); tile.appendChild(num); tile.appendChild(dim);
-  tile.appendChild(pchip); tile.appendChild(fchip); tile.appendChild(star); tile.appendChild(selWrap); tile.appendChild(dl); tile.appendChild(del); tile.appendChild(vplay);
+  const pdfchip = document.createElement('div'); pdfchip.className = 'pdfchip'; pdfchip.textContent = 'PDF';
+  const pname = document.createElement('div'); pname.className = 'pname';
+  tile.appendChild(img); tile.appendChild(pname); tile.appendChild(num); tile.appendChild(dim);
+  tile.appendChild(pchip); tile.appendChild(pdfchip); tile.appendChild(fchip); tile.appendChild(star); tile.appendChild(selWrap); tile.appendChild(dl); tile.appendChild(del); tile.appendChild(vplay);
   return tile;
 }
 
@@ -3131,6 +3223,7 @@ function applyTileData(node, slot) {
   node.dataset.hasprompt = (prompts[i] && prompts[i].length) ? "1" : "0";
   node.dataset.fav = favorites.has(entry.path) ? "1" : "0";
   node.dataset.video = (entry && isVideo(entry.name)) ? "1" : "0";
+  node.dataset.pdf = (entry && isPdf(entry.name)) ? "1" : "0";
   node.dataset.folder = folder;
   node.dataset.depth = String(Math.min(depth, 8));
 
@@ -3140,7 +3233,7 @@ function applyTileData(node, slot) {
   const fchip = node.querySelector('.fchip');
   const sel = node.querySelector('.sel');
   num.textContent = String(i + 1);
-  dim.textContent = fmtDims(dims[i] || null);
+  dim.textContent = fmtDimsFor(i);
   if (fchip) {
     fchip.textContent = folder;
     fchip.title = folder;
@@ -3165,6 +3258,7 @@ function resetTileNode(node) {
     img._thumbPending = false;
   }
   node.classList.remove('loaded', 'errored');
+  node.dataset.pdfcard = "0";
 }
 
 // Cached blob-URL per file index. Prevents Rust thumb re-requests when the
@@ -3298,6 +3392,23 @@ function loadThumbForNode(node, i, img) {
   // Reset placeholder state for the tile.
   const tile = node;
   tile.classList.remove('loaded', 'errored');
+  tile.dataset.pdfcard = "0";
+
+  // PDFs: the desktop build renders page 1 natively (below). Browsers, and
+  // PDFs the renderer rejects (e.g. password-protected), get a document card.
+  const pdf = !!entry && isPdf(entry.name);
+  const showPdfCard = () => {
+    if (!current()) return;
+    img._thumbPending = false;
+    const pname = tile.querySelector('.pname');
+    if (pname) pname.textContent = entry.name;
+    tile.dataset.pdfcard = "1";
+    img.alt = entry.name;
+    img.onerror = null;
+    img.src = PDF_CARD_URL;
+    markLoaded();
+  };
+  if (pdf && !nativeThumbsFor(entry)) { showPdfCard(); return; }
 
   // Video tiles: capture a poster frame client-side (Rust can't decode video).
   // Cached in the same LRU as image thumbs so re-scroll doesn't re-decode.
@@ -3347,11 +3458,12 @@ function loadThumbForNode(node, i, img) {
         return;
       }
       img._thumbPending = false;
-      if (!url) { tile.classList.add('errored'); return; }
+      if (!url) { if (pdf) showPdfCard(); else tile.classList.add('errored'); return; }
       rememberThumbUrl(i, url);
       img.alt = entry.name;
       img.onerror = () => {
-        if (current()) tile.classList.add('errored');
+        if (!current()) return;
+        if (pdf) showPdfCard(); else tile.classList.add('errored');
       };
       img.addEventListener('load', async () => {
         if (!current()) return;
@@ -3868,6 +3980,41 @@ function showVideoOverlay(file) {     // browser: object URL
   _showVideoCommon();
 }
 
+// ---- PDF overlay -------------------------------------------------------------
+// The browser's / WebView2's built-in viewer supplies paging, zoom and search.
+// A fresh <iframe> per document: removing it releases the renderer, and a new
+// frame's first load adds no session-history entry (reusing one frame would
+// make the browser Back button step through previously viewed PDFs).
+let viewerPdfFrame = null;
+let viewerPdfUrl = "";  // browser object URL for the current PDF (revoke on hide)
+function usePdfOverlay(i) { return isValidIndex(i) && isPdfIndex(i); }
+// Video and PDF overlays bring their own controls. Canvas gestures, the image
+// context menu and the zoom/rotate keys must leave their input alone.
+function usesOwnControls(i) { return useVideoOverlay(i) || usePdfOverlay(i); }
+function hidePdfOverlay() {
+  if (viewerPdfFrame) { viewerPdfFrame.remove(); viewerPdfFrame = null; }
+  if (viewerPdfUrl) { try { URL.revokeObjectURL(viewerPdfUrl); } catch (_) {} viewerPdfUrl = ""; }
+  viewerCanvas.style.display = '';
+}
+function showPdfOverlay(url, ownedUrl) {
+  hidePdfOverlay();
+  if (ownedUrl) viewerPdfUrl = url;
+  const frame = viewerPdfFrame = document.createElement('iframe');
+  frame.id = 'viewerPdfOverlay';
+  frame.title = 'PDF document';
+  frame.src = url;
+  viewerImgOverlay.style.display = 'none';
+  viewerCanvas.style.display = 'none';
+  viewerStage.insertBefore(frame, viewerStage.querySelector('.filmstripWrap'));
+  viewer.classList.remove('loading');
+}
+// Native shim Files have no MIME type; an untyped blob would be offered as a
+// download instead of rendering, so always hand the frame a typed blob.
+function pdfObjectUrl(file) {
+  const blob = file.type === 'application/pdf' ? file : new Blob([file], { type:'application/pdf' });
+  return URL.createObjectURL(blob);
+}
+
 function setZoomClasses() { viewer.classList.toggle('zoomed', zoomS > 1.0001); viewer.classList.toggle('dragging', dragging); }
 function stageRect() { const r = viewerStage.getBoundingClientRect(); return { w:r.width||1, h:r.height||1, left:r.left, top:r.top }; }
 function computeBaseScale() {
@@ -3932,7 +4079,7 @@ function zoomAt(cx, cy, factor) {
 
 viewerStage.addEventListener('wheel', (e) => {
   if (!viewer.classList.contains('open')) return;
-  if (useVideoOverlay(currentIndex)) return; // video: no zoom, let events pass to controls
+  if (usesOwnControls(currentIndex)) return; // video/PDF: no zoom, let events pass to controls
   e.preventDefault(); e.stopPropagation();
   zoomAt(e.clientX, e.clientY, Math.pow(1.0015, -e.deltaY));
 }, { passive:false });
@@ -3943,7 +4090,7 @@ function scheduleDragDraw() {
 }
 viewerStage.addEventListener('pointerdown', (e) => {
   if (!viewer.classList.contains('open')) return;
-  if (useVideoOverlay(currentIndex)) return; // let the <video> controls (play, scrub) handle pointers
+  if (usesOwnControls(currentIndex)) return; // let <video> / PDF viewer controls handle pointers
   if (e.button !== 0 || e.target.closest('button, input, select, #viewerFilmstrip, .filmstripWrap')) return;
   e.preventDefault(); e.stopPropagation();
   dragging = true;
@@ -3969,7 +4116,7 @@ function endDrag(e) {
 }
 viewerStage.addEventListener('pointerup', endDrag);
 viewerStage.addEventListener('pointercancel', endDrag);
-viewerStage.addEventListener('click', e => { if (useVideoOverlay(currentIndex)) return; e.preventDefault(); e.stopPropagation(); });
+viewerStage.addEventListener('click', e => { if (usesOwnControls(currentIndex)) return; e.preventDefault(); e.stopPropagation(); });
 viewer.addEventListener('click', e => { if (e.target === viewerVideoOverlay) return; e.preventDefault(); e.stopPropagation(); });
 
 function createDecodeWorker() {
@@ -4141,9 +4288,9 @@ async function startDecode(i, wantFullRes) {
 function updateViewerButtons(i) {
   if (!isValidIndex(i)) return;
   const d = dims[i] || null;
-  viewerDims.textContent = fmtDims(d);
-  if (useVideoOverlay(i)) {
-    // Video has no preview/full-res decode concept.
+  viewerDims.textContent = fmtDimsFor(i);
+  if (usesOwnControls(i)) {
+    // Video and PDF have no preview/full-res decode concept.
     viewerFull.style.display = "none";
     setBadge("", false);
     return;
@@ -4360,6 +4507,10 @@ async function ensureFilmstripThumb(globalIdx) {
       url = res?.url || "";
     } else if (entry.handle?._rootId && typeof window.__fgThumbUrl === 'function') {
       url = await window.__fgThumbUrl(entry.handle._rootId, entry.handle._rel, 256, { signal });
+      // Unrenderable PDFs get the shared card (a data URL; revoking it is a no-op).
+      if (!url && isPdf(entry.name)) url = PDF_CARD_URL;
+    } else if (isPdf(entry.name)) {
+      url = PDF_CARD_URL;
     } else {
       try {
         const f = await getFileForEntry(entry);
@@ -4565,6 +4716,7 @@ async function openViewer(i, viewPos) {
   if (typeof hidePromptTip === 'function') hidePromptTip();
   hideImgOverlay();
   hideVideoOverlay();  // stop + clear any previous video before loading the next item
+  hidePdfOverlay();
   closeBitmap(bmp); bmp = null; bmpW = 1; bmpH = 1;
   drawViewer(); // Clear the retained canvas before any asynchronous file work.
   viewer.classList.add('loading');
@@ -4578,7 +4730,7 @@ async function openViewer(i, viewPos) {
   const path = files[i].path || files[i].name;
   const total = view.length || files.length;
   viewerTitle.textContent = `${currentViewPos + 1} / ${total} — ${path}`;
-  viewerDims.textContent = fmtDims(dims[i] || null);
+  viewerDims.textContent = fmtDimsFor(i);
   if (typeof fsPanelRefreshTitle === 'function') fsPanelRefreshTitle();
   viewer.classList.add('open');
   viewer.setAttribute('aria-hidden', 'false');
@@ -4589,7 +4741,21 @@ async function openViewer(i, viewPos) {
   fullResLimited = false;
   updateViewerButtons(i);
   updateFavButton();
-  if (useVideoOverlay(i)) {
+  if (usePdfOverlay(i)) {
+    // Desktop: the asset protocol streams the file with its PDF type (no bytes
+    // in JS). Browser: a typed object URL.
+    const abs = files[i] && files[i].abs;
+    if (abs && typeof window.__fgAssetUrl === 'function') {
+      if (i === currentIndex) showPdfOverlay(window.__fgAssetUrl(abs), false);
+    } else {
+      try {
+        const f = await getFileForEntry(files[i]);
+        if (current()) showPdfOverlay(pdfObjectUrl(f), true);
+      } catch (_) {
+        if (current()) { viewer.classList.remove('loading'); setBadge('Document unavailable', true); }
+      }
+    }
+  } else if (useVideoOverlay(i)) {
     // Video streams via the range-capable asset protocol on desktop (no bytes
     // in JS); browser falls back to an object URL. No autoplay — hover plays.
     const abs = files[i] && files[i].abs;
@@ -4644,6 +4810,7 @@ function closeViewer() {
   setFullscreen(false);
   hideImgOverlay();
   hideVideoOverlay();  // never let audio survive a close
+  hidePdfOverlay();
   viewer.classList.remove('open','loading','showPrompt');
   viewer.setAttribute('aria-hidden', 'true');
   closeBitmap(bmp); bmp = null; bmpW = 1; bmpH = 1;
@@ -4911,6 +5078,7 @@ async function clipboardImageBlob(i) {
 }
 async function copyCurrentImage() {
   if (!isValidIndex(currentIndex) || useVideoOverlay(currentIndex)) return;
+  if (usePdfOverlay(currentIndex)) { showActionNotice('PDFs cannot be copied as an image. Use Copy image path or Download original instead.'); return; }
   if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
     showActionNotice('Image copying is unavailable here. Use Download original instead.'); return;
   }
@@ -4936,7 +5104,7 @@ for (const [label, action] of [['Copy image',copyCurrentImage],['Copy image path
 }
 viewer.appendChild(imageContextMenu);
 viewerStage.addEventListener('contextmenu',e=>{
-  if (useVideoOverlay(currentIndex) || e.target.closest('button,input,select')) return;
+  if (usesOwnControls(currentIndex) || e.target.closest('button,input,select')) return;
   e.preventDefault(); imageContextMenu.hidden=false;
   imageContextMenu.style.left=Math.min(e.clientX,window.innerWidth-210)+'px';
   imageContextMenu.style.top=Math.min(e.clientY,window.innerHeight-140)+'px';
@@ -5101,9 +5269,9 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 's' || e.key === 'S') { toggleSlideshow(); e.preventDefault(); return; }
   if (e.key === 't' || e.key === 'T') { toggleFilmstrip(undefined, true); e.preventDefault(); return; }
   if (e.key === 'm' || e.key === 'M') { viewerMute.click(); e.preventDefault(); return; }
-  // Zoom/rotate keys don't apply to video (canvas-only). Swallow them so they
-  // can't disturb the <video> or steal focus.
-  if (useVideoOverlay(currentIndex) &&
+  // Zoom/rotate keys don't apply to video or PDF (canvas-only). Swallow them so
+  // they can't disturb the overlay or steal focus.
+  if (usesOwnControls(currentIndex) &&
       (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_' ||
        e.key === '0' || e.key === '1' || e.key === 'r' || e.key === 'R')) {
     e.preventDefault(); return;
@@ -5875,7 +6043,8 @@ async function startPrefetchColors() {
       const cur = idx++;
       await waitForBackground(signal);
       if (token.aborted || signal.aborted || generation !== fileGeneration) return;
-      if (!colors[cur] && !isVideoIndex(cur)) {  // videos have no decodable color signature
+      // Videos have no decodable color signature; browser PDFs have no page render.
+      if (!colors[cur] && !isVideoIndex(cur) && !(isPdfIndex(cur) && !nativeThumbsFor(files[cur]))) {
         try {
           const entry = files[cur];
           let url = "";
@@ -6178,9 +6347,11 @@ async function resetAndLoadFiles(entries, key, preserveViewer = false, legacyAli
   selected.clear();
   lastSelectedK = -1;
   rootKey = key || "";
-  const loadedFavorites = await loadFavoritesFor(rootKey);
-  if (generation !== fileGeneration) return false;
-  favorites = loadedFavorites;
+  if (!preserveViewer) {
+    const loadedFavorites = await loadFavoritesFor(rootKey);
+    if (generation !== fileGeneration) return false;
+    favorites = loadedFavorites;
+  }
 
   empty.style.display = files.length ? "none" : "block";
   document.body.classList.toggle('nofiles', !files.length);
@@ -6195,7 +6366,7 @@ async function resetAndLoadFiles(entries, key, preserveViewer = false, legacyAli
   // Guardrail: if a stale filter would leave the grid empty despite the
   // folder having files, relax the two most-likely culprits and re-save.
   // Prevents the "0 shown, nothing renders" trap after opening a new root.
-  if (files.length) {
+  if (files.length && !preserveViewer) {
     let relaxed = false;
     // Try a dry-run buildView; if empty, clear the filters that most often
     // hide everything on a new root.
@@ -6216,7 +6387,9 @@ async function resetAndLoadFiles(entries, key, preserveViewer = false, legacyAli
 
   // Auto-open BEFORE any dim scan, so double-click-image → viewer opens in
   // ~one file read instead of waiting for the whole folder to be measured.
-  await maybeAutoOpenFromBoot();
+  // A same-root watch refresh commits synchronously: keep live favorites and
+  // never replay an external open while restoring the current viewer.
+  if (!preserveViewer) await maybeAutoOpenFromBoot();
 
   if (files.length) {
     // Prioritize the file we just auto-opened, then the first-viewport batch,
@@ -6360,13 +6533,29 @@ async function refreshFilesFromRoot() {
   const root = currentRootHandle;
   const generation = fileGeneration;
   try {
-    // Snapshot state we want to preserve across the reset.
+    // Scan before capturing UI state: navigation, selection and scroll can
+    // change while the asynchronous walk is running.
+    resetSidecars();
+    const collected = [];
+    const stats = { walkErrors: 0 };
+    try {
+      await walkDirectoryFSA(root, (batch) => {
+        for (const e of batch) collected.push(e);
+      }, undefined, stats);
+    } catch (_) {}
+    if (root !== currentRootHandle) return;
+    if (generation !== fileGeneration) { _fgRefreshQueued = true; return; }
+    if (deleteInProgress) { _fgRefreshQueued = true; return; }
+    collected.sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
+
+    // Capture the latest state immediately before the synchronous root reset.
     const prevSelectedPaths = new Set();
     for (const idx of selected) {
       if (isValidIndex(idx) && files[idx]) prevSelectedPaths.add(files[idx].path);
     }
     const openInViewer = viewer.classList.contains('open') && isValidIndex(currentIndex);
     const viewerPath = openInViewer ? files[currentIndex].path : "";
+    const viewerWasLoading = openInViewer && viewer.classList.contains('loading');
     // Save scroll anchor by path (index-based anchor is invalidated by rescan).
     let anchorPath = "";
     let anchorOffsetY = 0;
@@ -6387,23 +6576,10 @@ async function refreshFilesFromRoot() {
       if (colors[i]  !== undefined) prevColors.set(p, colors[i]);
     }
 
-    // Re-walk. Reuse walkDirectoryFSA so browser + native paths converge.
-    resetSidecars();
-    const collected = [];
-    const stats = { walkErrors: 0 };
-    try {
-      await walkDirectoryFSA(root, (batch) => {
-        for (const e of batch) collected.push(e);
-      }, undefined, stats);
-    } catch (_) {}
-    if (root !== currentRootHandle) return;
-    if (generation !== fileGeneration) { _fgRefreshQueued = true; return; }
-    if (deleteInProgress) { _fgRefreshQueued = true; return; }
-    collected.sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1);
-
     // resetAndLoadFiles wipes selection + caches; capture the ones we want back.
     const rootKeyPrev = rootKey;
     if (!await resetAndLoadFiles(collected, rootKeyPrev, true, legacyFavoriteKeysFor(root))) return;
+    if (root !== currentRootHandle || fileGeneration !== generation + 1) return;
 
     // Restore per-file caches by matching path.
     for (let i = 0; i < files.length; i++) {
@@ -6433,7 +6609,19 @@ async function refreshFilesFromRoot() {
           const path = files[newIdx].path || files[newIdx].name;
           const total = view.length || files.length;
           viewerTitle.textContent = `${vpos + 1} / ${total} — ${path}`;
+          updateViewerButtons(newIdx);
+          updateFavButton();
           if (typeof fsPanelRefreshTitle === 'function') fsPanelRefreshTitle();
+          // Reset canceled old index-bound work. Resume an unfinished decode,
+          // while a completed bitmap keeps its zoom, pan and rotation intact.
+          if (viewerWasLoading && !usesOwnControls(newIdx) && !useImgOverlay(newIdx)) {
+            const retainedGeneration = fileGeneration, retainedOpenId = viewerOpenId;
+            const wantFullRes = isFullRes || fullResLimited;
+            ensureDims(newIdx).then(() => {
+              if (fileGeneration === retainedGeneration && viewerOpenId === retainedOpenId &&
+                  currentIndex === newIdx && viewer.classList.contains('open')) startDecode(newIdx, wantFullRes);
+            });
+          }
         } else {
           // Filtered out — close viewer rather than showing stale content.
           closeViewer();
@@ -6456,7 +6644,8 @@ async function refreshFilesFromRoot() {
       }
     }
     // Re-render filmstrip if the viewer is showing it, since view indices moved.
-    if (filmstripOn) renderFilmstripVisible();
+    if (filmstripOn) { renderFilmstrip(); schedulePrefetchFilmstrip(); }
+    refreshStatus();
   } finally {
     _fgRefreshInFlight = false;
     if (_fgRefreshQueued && !deleteInProgress) {

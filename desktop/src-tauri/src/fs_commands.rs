@@ -352,9 +352,40 @@ fn decode_scaled(src: &Path, max_edge: u32, max_pixels: u64) -> Result<DynamicIm
     Ok(scaled)
 }
 
+pub(crate) fn is_pdf(path: &Path) -> bool {
+    path.extension()
+        .and_then(|s| s.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"))
+}
+
+#[cfg(windows)]
+fn pdf_page_size(src: &Path) -> Result<(u32, u32), String> {
+    crate::pdf::page_size(src)
+}
+#[cfg(not(windows))]
+fn pdf_page_size(_src: &Path) -> Result<(u32, u32), String> {
+    Err("pdf rendering is not supported on this platform".into())
+}
+
+// The page is rasterized straight to the requested edge, so no oversized
+// source bitmap exists. Still serialize it with other heavy decodes.
+#[cfg(windows)]
+fn decode_pdf_page(src: &Path, max: u32) -> Result<DynamicImage, String> {
+    let png = crate::pdf::render_first_page_png(src, max)?;
+    image::load_from_memory_with_format(&png, ImageFormat::Png).map_err(|e| format!("decode: {e}"))
+}
+#[cfg(not(windows))]
+fn decode_pdf_page(_src: &Path, _max: u32) -> Result<DynamicImage, String> {
+    Err("pdf rendering is not supported on this platform".into())
+}
+
 fn render_thumb(src: &Path, max: u32) -> Result<Vec<u8>, String> {
     let _decode = IMAGE_DECODE_LOCK.lock().map_err(|_| "image decoder unavailable")?;
-    let scaled = decode_scaled(src, max, u64::from(max) * u64::from(max))?;
+    let scaled = if is_pdf(src) {
+        decode_pdf_page(src, max)?
+    } else {
+        decode_scaled(src, max, u64::from(max) * u64::from(max))?
+    };
     let mut buf: Vec<u8> = Vec::with_capacity(64 * 1024);
     let mut cur = Cursor::new(&mut buf);
     let rgb = scaled.to_rgb8();
@@ -412,6 +443,9 @@ pub async fn fs_dims(
     let root = root_for(&state, &root_id)?;
     let p = resolve_child(&root, &rel)?;
     tauri::async_runtime::spawn_blocking(move || {
+        if is_pdf(&p) {
+            return pdf_page_size(&p);
+        }
         let reader = ImageReader::open(&p).map_err(|e| e.to_string())?
             .with_guessed_format().map_err(|e| e.to_string())?;
         let mut decoder = reader.into_decoder().map_err(|e| e.to_string())?;
@@ -539,6 +573,7 @@ fn guess_mime(path: &str) -> &'static str {
     if lower.ends_with(".bmp") { return "image/bmp"; }
     if lower.ends_with(".mp4") { return "video/mp4"; }
     if lower.ends_with(".webm") { return "video/webm"; }
+    if lower.ends_with(".pdf") { return "application/pdf"; }
     if lower.ends_with(".html") || lower.ends_with(".htm") { return "text/html; charset=utf-8"; }
     "application/octet-stream"
 }
@@ -635,6 +670,28 @@ mod performance_tests {
             .expect("decode preview PNG");
         assert_eq!((preview.width(), preview.height()), (100, 50));
         assert_eq!(preview.to_rgba8().get_pixel(0, 0)[3], 0);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn pdf_thumbnail_is_a_bounded_jpeg_of_the_first_page() {
+        let file = std::env::temp_dir().join(format!("gallery-synthetic-{}.pdf", uuid::Uuid::new_v4()));
+        fs::write(&file, crate::pdf::tests::synthetic_pdf(800, 400)).expect("write synthetic pdf");
+        let thumb = render_thumb(&file, 200);
+        let _ = fs::remove_file(&file);
+        let bytes = thumb.expect("render pdf thumbnail");
+        assert_eq!(image::guess_format(&bytes).expect("thumbnail format"), ImageFormat::Jpeg);
+        let img = image::load_from_memory(&bytes).expect("decode thumbnail");
+        assert_eq!(img.width(), 200);
+        assert!((img.height() as i32 - 100).abs() <= 1);
+    }
+
+    #[test]
+    fn pdf_detection_ignores_case_and_other_formats() {
+        assert!(is_pdf(Path::new("a/Report.PDF")));
+        assert!(is_pdf(Path::new("b.pdf")));
+        assert!(!is_pdf(Path::new("pdf.png")));
+        assert!(!is_pdf(Path::new("noext")));
     }
 
     #[test]

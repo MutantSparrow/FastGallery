@@ -122,7 +122,7 @@
   window.__fgDecodeStats = () => ({ active:thumbActive, queued:thumbQueue.length, completed:completedDecodes, lastDecodeMs });
 
   // Match the extension filter Fast Gallery already uses (see IMAGE_EXT_RE).
-  const IMG_RE = /\.(png|jpe?g|webp|gif|avif|bmp|mp4|webm)$/i;
+  const IMG_RE = /\.(png|jpe?g|webp|gif|avif|bmp|mp4|webm|pdf)$/i;
   const LOG_RE = /^log\.html?$/i;
 
   // Per-directory listing cache: Map<`${rootId}:${rel}`, Entry[]>.

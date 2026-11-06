@@ -1,6 +1,8 @@
 mod fs_commands;
 #[cfg(windows)]
 mod assoc;
+#[cfg(windows)]
+mod pdf;
 
 use fs_commands::{
     fg_image_handler, fs_delete, fs_dims, fs_list, fs_list_dir, fs_open_root, fs_read_bytes,
@@ -97,9 +99,14 @@ fn extract_image_arg(argv: &[String]) -> Option<PathBuf> {
 
 fn is_image_ext(p: &Path) -> bool {
     match p.extension().and_then(|s| s.to_str()).map(|s| s.to_ascii_lowercase()) {
-        Some(ext) => matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "avif" | "mp4" | "webm"),
+        Some(ext) => matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "avif" | "mp4" | "webm" | "pdf"),
         None => false,
     }
+}
+
+/// Tray menu / tooltip label identifying the running build.
+fn version_label(version: &str) -> String {
+    format!("Fast Gallery v{version}")
 }
 
 /// Turn an image path into { file, root } JSON payload for the webview.
@@ -181,7 +188,11 @@ pub fn run() {
             assoc_open_default_apps,
         ])
         .setup(|app| {
-            // Tray icon + menu
+            // Tray icon + menu. The disabled first entry shows which build is
+            // running, so a stale tray instance is easy to spot.
+            let version = version_label(&app.package_info().version.to_string());
+            let version_item = MenuItem::with_id(app, "version", &version, false, None::<&str>)?;
+            let sep0 = PredefinedMenuItem::separator(app)?;
             let show_item = MenuItem::with_id(app, "show", "Show / hide", true, None::<&str>)?;
             let assoc_install = MenuItem::with_id(app, "assoc_install", "Register file associations", true, None::<&str>)?;
             let assoc_remove = MenuItem::with_id(app, "assoc_remove", "Remove file associations", true, None::<&str>)?;
@@ -191,6 +202,8 @@ pub fn run() {
             let menu = Menu::with_items(
                 app,
                 &[
+                    &version_item,
+                    &sep0,
                     &show_item,
                     &sep1,
                     &assoc_install,
@@ -203,7 +216,7 @@ pub fn run() {
 
             let _tray = TrayIconBuilder::with_id("fg-tray")
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Fast Gallery")
+                .tooltip(&version)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -283,4 +296,23 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Fast Gallery");
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::*;
+
+    #[test]
+    fn tray_label_names_the_running_version() {
+        assert_eq!(version_label("1.7.0"), "Fast Gallery v1.7.0");
+    }
+
+    // tauri.conf.json supplies package_info().version for the tray; Cargo.toml
+    // supplies the crate version. A release must not ship with them disagreeing.
+    #[test]
+    fn tauri_and_cargo_versions_agree() {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("parse tauri.conf.json");
+        assert_eq!(conf["version"].as_str(), Some(env!("CARGO_PKG_VERSION")));
+    }
 }

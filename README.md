@@ -15,6 +15,7 @@ The viewer uses the same **Controls** panel in standard and fullscreen modes, wi
 
 ## Features
 
+- **PDF documents** — PDFs appear in the grid beside images. The desktop app shows a rendered first page, produced by Windows' built-in PDF engine and cached like other thumbnails. The HTML app, which has no PDF renderer, shows a document card with the filename. Opening a PDF uses the browser's or WebView2's own PDF viewer, with paging, zoom, search and print. Sizes are shown in points. Prompt extraction and image copying skip PDFs; in the HTML app they also have no color signature. Click outside the document, for example on the viewer toolbar, before using gallery shortcuts again.
 - **Video hover previews** — hover over an MP4 or WebM tile to play a muted, looping preview. Leaving the tile restores its poster. Only one preview plays at a time; opening the viewer, scrolling, or leaving the app stops it. Click the tile for full playback controls.
 - **Masonry grid** — virtualized, with 1–12 columns. Visible thumbnails remain mounted as discovery updates the layout.
 - **Canvas viewer** — wheel zoom below fit size, drag pan with corners movable to viewport center, EXIF orientation, bounded preview by default with higher resolution on demand, rotation, optional filmstrip (closed initially), and slideshow with an editable 0.25–3600 second interval.
@@ -39,7 +40,7 @@ The viewer uses the same **Controls** panel in standard and fullscreen modes, wi
 - **Fallback picker** — `<input webkitdirectory>` on Firefox and Safari. All features work; favorites become session-only.
 - **ZIP export** — select several tiles → `Download`. Writes an uncompressed ZIP in-browser. 512 MB cap.
 - **Loader feedback** — progress panel during folder scan and dimension reading.
-- **Formats** — PNG, JPEG, WebP, GIF, AVIF, BMP, MP4 and WebM, subject to browser codec support. Native AVIF thumbnails/previews remain incomplete.
+- **Formats** — PNG, JPEG, WebP, GIF, AVIF, BMP, MP4, WebM and PDF, subject to browser codec and PDF viewer support. Native AVIF thumbnails/previews remain incomplete.
 
 ## Usage
 
@@ -64,8 +65,9 @@ Tauri 2 wrapper that eliminates browser sandbox friction. `desktop/` in the repo
 - Header-only dimension probe, header-only metadata read (2 MB slice). Prompt prefetch never ships pixels.
 - Large-image previews: supported large images are resized in Rust before entering the webview. Cached thumbnails appear while the larger preview loads; navigating away cancels queued work and discards obsolete results. Normal previews use at most 16 million pixels; the on-demand higher-resolution view is capped at 96 million pixels and a 16,384px edge.
 - Real absolute paths in `Copy path` / `Copy folder path`.
-- System tray, close-to-tray. Global shortcut `Ctrl+Alt+G` to toggle window.
-- Windows file association: `Open with Fast Gallery` on `.png/.jpg/.jpeg/.webp/.gif/.bmp/.avif` (Settings → Default apps → pick Fast Gallery to promote to default).
+- System tray, close-to-tray. Global shortcut `Ctrl+Alt+G` to toggle window. The tray menu's first line (and the tray tooltip) shows the running version, e.g. `Fast Gallery v1.7.0`.
+- Windows file association: `Open with Fast Gallery` on `.png/.jpg/.jpeg/.webp/.gif/.bmp/.avif/.mp4/.webm/.pdf` (Settings → Default apps → pick Fast Gallery to promote to default). Registering does not replace your default PDF app.
+- PDF first-page thumbnails rendered natively through Windows.Data.Pdf, with no bundled renderer. Password-protected or damaged PDFs fall back to the document card.
 - Single-instance forwarding: double-clicking a second image while the app is running jumps that window to the new file.
 - Dynamic tab title reflecting state (working, scanning, viewing, browsing).
 
@@ -73,7 +75,9 @@ Background dimension, prompt, and color scans pause while the viewer is open. La
 
 Regression checks: `node --test tests/*.test.cjs` from the repository root. See [working notes](docs/PROJECT_NOTES.md) for architecture and remaining audit items, [performance work](docs/PERFORMANCE_WORK.md) for native limits, and [usability work](docs/USABILITY_WORK.md) for the latest behavior and verification scope.
 
-The latest portable build and its checksum record are in `desktop/release/fast-gallery-v1.6.1-usability.exe` and its adjacent `.build.json`. Quit any running tray instance before launching a replacement executable. Older executables cannot read the upgraded favorites database; retaining an old EXE does not roll back that database.
+The latest portable build and its checksum record are in `desktop/release/fast-gallery-v1.7.0.exe` and its adjacent `.build.json`. Version 1.7.0 adds PDF support (see [PDF work](docs/PDF_WORK.md)) on top of the 1.6.1 live-refresh build. Release builds are numbered by version; check the tray menu's first line to confirm which one is running. Quit any running tray instance before launching a replacement executable. Older executables cannot read the upgraded favorites database; retaining an old EXE does not roll back that database.
+
+After switching portable builds, use **Register file associations** in the new build's tray menu. Windows retains the previous executable path until this registration is updated. An older build opening the upgraded database can fail with a blank gallery; use the current build without clearing favorites. See [opening diagnostics](docs/OPENING_WORK.md).
 
 ### Build
 

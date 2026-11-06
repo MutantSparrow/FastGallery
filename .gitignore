@@ -7,11 +7,15 @@ node_modules/
 .idea/
 .claude/
 
-# Keep only the current verified portable release and its provenance record.
+# Keep selected verified portable releases and their provenance records.
 desktop/release/*.exe
 desktop/release/*.build.json
 !desktop/release/fast-gallery-v1.6.1-usability.exe
 !desktop/release/fast-gallery-v1.6.1-usability.build.json
+!desktop/release/fast-gallery-v1.6.1-live-refresh.exe
+!desktop/release/fast-gallery-v1.6.1-live-refresh.build.json
+!desktop/release/fast-gallery-v1.7.0.exe
+!desktop/release/fast-gallery-v1.7.0.build.json
 
 # Local development artifacts, not part of the repo
 Test/

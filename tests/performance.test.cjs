@@ -245,11 +245,11 @@ test('background scans pause for the viewer and wake on resume or cancellation',
 test('re-rendering a pending tile does not enqueue duplicate heavy decodes', async () => {
   let calls=0,resolveThumb; const revoked=[];
   const entry={name:'sample.png',handle:{_rootId:'root',_rel:'sample.png'}};
-  const c=vm.createContext({files:[entry],fileGeneration:1,AbortController,isVideo:()=>false,
+  const c=vm.createContext({files:[entry],fileGeneration:1,AbortController,isVideo:()=>false,isPdf:()=>false,
     window:{__fgThumbUrl:()=>{calls++;return new Promise(r=>{resolveThumb=r;});}},
     thumbUrlByIdx:new Map(),URL:{revokeObjectURL:u=>revoked.push(u)}});
   vm.runInContext(source('function loadThumbForNode(', 'function renderVisible('),c);
-  const img={},node={classList:classes()};
+  const img={},node={classList:classes(),dataset:{}};
   c.loadThumbForNode(node,0,img); c.loadThumbForNode(node,0,img);
   assert.equal(calls,1);
   node._thumbAbort.abort(); resolveThumb('blob:old'); await tick();
@@ -276,7 +276,7 @@ function gridHarness() {
     files:[0,1,2].map(i=>({name:`sample-${i}.png`,path:`sample-${i}.png`,handle:{_rootId:'root',_rel:`sample-${i}.png`}})),
     view:[0,1,2],dims:[],prompts:[],colors:[],selected:new Set(),favorites:new Set(),
     desiredCols:3,GAP:8,MIN_COL_W:100,fileGeneration:1,hoverPreview:null,
-    stopHoverPreview(){},folderOf:()=>'',depthOf:()=>0,fmtDims:d=>d?`${d.w}x${d.h}`:'',isVideo:()=>false,
+    stopHoverPreview(){},folderOf:()=>'',depthOf:()=>0,fmtDimsFor:i=>c.dims[i]?`${c.dims[i].w}x${c.dims[i].h}`:'',isVideo:()=>false,isPdf:()=>false,
     thumbUrlByIdx:new Map(),rememberThumbUrl(i,url){c.thumbUrlByIdx.set(i,url);},computeColorSignature:()=>null,
     URL:{revokeObjectURL:u=>events.revoked.push(u)},
     window:{scrollY:0,innerHeight:800,scrollTo(x,y){this.scrollY=y;},
