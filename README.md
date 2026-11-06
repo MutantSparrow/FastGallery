@@ -5,7 +5,7 @@ Local image browser. Two flavors from one codebase:
 - **`fast-gallery.html`** — single-file HTML. Open in any modern browser, point at a folder, done. No install.
 - **Fast Gallery desktop** (Windows) — Tauri 2 wrapper around the same HTML. Native filesystem I/O, Rust-side thumbnails, file associations, tray + global shortcut, single-instance argv forwarding for real double-click-image → viewer flow.
 
-Fast masonry gallery, canvas viewer, hierarchical folder navigation, prompt extraction (A1111 / ComfyUI / Fooocus `log.html` sidecars), delete, drag-and-drop.
+Fast masonry gallery, canvas viewer, hierarchical folder navigation, prompt extraction (A1111 / ComfyUI / [JustRayzist](https://github.com/MutantSparrow/JustRayzist) / Fooocus `log.html` sidecars), delete, drag-and-drop.
 
 ## Screenshots
 
@@ -40,7 +40,7 @@ The viewer uses the same **Controls** panel in standard and fullscreen modes, wi
   - dominant color (13 hue buckets + neutral, computed from thumbnails)
   - prompt keyword (AND-match against extracted metadata)
   - favorites only
-- **Prompt extraction** — reads A1111 `parameters`, ComfyUI `prompt` graph, ComfyUI `workflow` (UI + API shapes), generic `prompt_*` PNG chunks, JPEG EXIF UserComment, and **Fooocus `log.html` sidecars** (per-folder). Cycles multiple prompts per image, copy to clipboard.
+- **Prompt extraction** — reads A1111 `parameters`, ComfyUI `prompt` graph, ComfyUI `workflow` (UI + API shapes), [JustRayzist](https://github.com/MutantSparrow/JustRayzist) `prompt` and wildcard-expanded `prompt_effective` chunks, generic `prompt_*` PNG chunks, JPEG EXIF UserComment, and **Fooocus `log.html` sidecars** (per-folder). Cycles multiple prompts per image, copy to clipboard.
 - **Favorites** — star tiles or press `F` in the viewer. Persisted per-folder in IndexedDB.
 - **Copy image** — `C` / `Ctrl+C` copies source-sized PNG pixels without viewport bars, independently of zoom and pan. Still images up to 64 million pixels and a 16,384 px edge are supported; use Download original for larger sources.
 - **Copy path / folder** — `Alt+C` copies the image path, `Shift+C` copies the folder path (paste into Explorer's address bar to reveal).
