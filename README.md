@@ -7,6 +7,14 @@ Local image browser. Two flavors from one codebase:
 
 Fast masonry gallery, canvas viewer, hierarchical folder navigation, prompt extraction (A1111 / ComfyUI / Fooocus `log.html` sidecars), delete, drag-and-drop.
 
+## Screenshots
+
+![Masonry gallery grid with the Gallery controls panel open: column slider, prompt and color scans, sorting, and filters](docs/assets/gallery-controls.webp)
+
+<p align="center">
+  <img src="docs/assets/viewer-prompt.webp" width="520" alt="Viewer showing a 2048×3072 image with the prompt panel open below it, displaying the extracted generation prompt">
+</p>
+
 ## Compact controls
 
 The gallery keeps Open folder, filename search, selection, and **Controls** in a compact toolbar. Open **Controls** for columns, metadata scans, sorting, filters, subfolder inclusion, and random browsing. The button shows the number of active filters even when the panel is closed. Selection downloads and deletion remain in the toolbar when items are selected.
